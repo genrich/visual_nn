@@ -1,0 +1,9 @@
+{application, visual_nn,
+ [
+  {description, "Visual Artificial Neural Network"},
+  {vsn, "0.0.1"},
+  {registered, [vnn_sup, vnn_yaws_sup]},
+  {applications, [kernel, stdlib]},
+  {mod, { vnn_app, []}},
+  {env, []}
+ ]}.
