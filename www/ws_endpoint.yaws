@@ -1,0 +1,3 @@
+<erl>
+out (_) -> {websocket, vnn_yaws_ws, []}.
+</erl>
