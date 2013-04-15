@@ -99,10 +99,9 @@ handle_cast ({_WsOwnerPid, sim_stop}, _) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info (timeout, #state{ws_owner_pid = WsOwnerPid, status = Status} = S) when WsOwnerPid =/= undefined ->
-    lager:debug ("timeout"),
     Val = case Status of true -> 1; false -> 0 end,
     yaws_api:websocket_send (WsOwnerPid, {binary, <<Val:32/little-signed-integer>>}),
-    {noreply, S#state{status = not Status}, random:uniform (2000) + 1000};
+    {noreply, S#state{status = not Status}, random:uniform (100) + 50};
 
 handle_info ({'EXIT', WsOwnerPid, _}, S) when WsOwnerPid =:= S#state.ws_owner_pid ->
     lager:debug ("ws_owner unlinked"),
