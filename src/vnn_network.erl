@@ -5,7 +5,7 @@
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record (state, {ws_owner_pid :: pid (), status :: boolean ()}).
+-record (state, {status :: boolean ()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -25,7 +25,7 @@ start_link () ->
 %% @end
 %%--------------------------------------------------------------------
 sim_start () ->
-    gen_server:cast (?MODULE, {self (), sim_start}).
+    gen_server:cast (?MODULE, sim_start).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -35,7 +35,7 @@ sim_start () ->
 %% @end
 %%--------------------------------------------------------------------
 sim_stop () ->
-    gen_server:cast (?MODULE, {self (), sim_stop}).
+    gen_server:cast (?MODULE, sim_stop).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -79,12 +79,11 @@ handle_call (_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast ({WsOwnerPid, sim_start}, #state{ws_owner_pid = undefined}) ->
+handle_cast (sim_start, _State) ->
     lager:debug ("sim_start"),
-    link (WsOwnerPid),
-    {noreply, #state{ws_owner_pid = WsOwnerPid, status = false}, 1000};
+    {noreply, #state{status = false}, 1000};
 
-handle_cast ({_WsOwnerPid, sim_stop}, _) ->
+handle_cast (sim_stop, _State) ->
     lager:debug ("sim_stop"),
     {noreply, #state{}}.
 
@@ -98,14 +97,10 @@ handle_cast ({_WsOwnerPid, sim_stop}, _) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info (timeout, #state{ws_owner_pid = WsOwnerPid, status = Status} = S) when WsOwnerPid =/= undefined ->
+handle_info (timeout, #state{status = Status}) ->
     Val = case Status of true -> 1; false -> 0 end,
-    yaws_api:websocket_send (WsOwnerPid, {binary, <<Val:32/little-signed-integer>>}),
-    {noreply, S#state{status = not Status}, random:uniform (100) + 50};
-
-handle_info ({'EXIT', WsOwnerPid, _}, S) when WsOwnerPid =:= S#state.ws_owner_pid ->
-    lager:debug ("ws_owner unlinked"),
-    {noreply, #state{}}.
+    vnn_event:send_event (Val),
+    {noreply, #state{status = not Status}, random:uniform (100) + 50}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -131,4 +126,3 @@ terminate (_Reason, _State) ->
 %%--------------------------------------------------------------------
 code_change (_OldVsn, State, _Extra) ->
     {ok, State}.
-
