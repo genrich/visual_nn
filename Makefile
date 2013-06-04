@@ -1,7 +1,10 @@
-.PHONY: build run
+.PHONY: build doc run
 
 build: deps/yaws
 	rebar compile
+
+doc:
+	rebar doc
 
 clean:
 	rebar clean
