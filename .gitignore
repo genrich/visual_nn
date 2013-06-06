@@ -1,5 +1,7 @@
-ebin/
 deps/
 doc/
+ebin/
+.eunit/
 log/
+deps_plt
 report.log
