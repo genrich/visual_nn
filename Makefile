@@ -1,4 +1,4 @@
-.PHONY: all doc readme compile run run_debug test dialyzer typer clean clean_all
+.PHONY: all doc readme compile shell run run_debug test dialyzer typer clean clean_all
 
 DEPS=goldrush lager ibrowse yaws
 PLT_APPS=erts kernel stdlib $(DEPS)
@@ -20,6 +20,9 @@ deps/yaws:
 compile: deps/yaws
 	rebar compile
 
+shell: compile
+	erl $(EBINS)
+
 run: compile
 	erl $(EBINS) -eval 'application:start (visual_nn).'
 
@@ -30,12 +33,14 @@ test:
 	rebar skip_deps=true eunit $(TEST_CASE)
 
 deps_plt:
+	rebar compile
 	rm -f deps/yaws/ebin/mime_type_c.beam
 	rm -f deps/yaws/ebin/yaws_generated.beam
-	# --no_check_plt
 	dialyzer $(PA_DEPS_EBIN) --output_plt $@ --build_plt --apps $(PLT_APPS)
 
 dialyzer: deps_plt
+	rebar compile
+	# --no_check_plt
 	dialyzer --fullpath --plt $^ -Wrace_conditions -r ebin
 
 typer:
@@ -46,9 +51,5 @@ clean:
 
 clean_all:
 	rebar skip_deps=true clean
-	rm -f deps_plt
-	rm -f README.html
-	rm -f report.log
-	rm -rf ebin/
-	rm -rf doc/
-	rm -rf log/
+	rm -f deps_plt README.html report.log
+	rm -rf ebin/ doc/ log/
