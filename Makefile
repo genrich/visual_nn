@@ -32,8 +32,9 @@ run_debug: compile
 test:
 	rebar skip_deps=true eunit $(TEST_CASE)
 
-deps_plt:
-	rebar compile
+deps_plt: deps/yaws
+	sed -i -e 's/no_debug_info/debug_info/' deps/yaws/rebar.config
+	rebar clean compile
 	rm -f deps/yaws/ebin/mime_type_c.beam
 	rm -f deps/yaws/ebin/yaws_generated.beam
 	dialyzer $(PA_DEPS_EBIN) --output_plt $@ --build_plt --apps $(PLT_APPS)
