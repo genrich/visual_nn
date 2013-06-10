@@ -1,70 +1,78 @@
+%%--------------------------------------------------------------------
+%% @doc
+%% Main module
+%% @end
+%%--------------------------------------------------------------------
 -module (vnn_network).
 
 -export ([start_link/0, sim_start/0, sim_stop/0]).
 
+-export_type([position/0]).
+
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record (state, {status :: boolean ()}).
+-type position () :: {number (), number (), number ()}.
+
+-record (state, {stimulus :: [pid ()]}).
+
+-include_lib ("lager/include/lager.hrl").
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
-%%
-%% @spec start_link () -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+-spec start_link () -> {ok, pid ()} | ignore | {error,  {already_started, pid ()} | term ()}.
+
 start_link () ->
     gen_server:start_link ({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Tmp
-%%
-%% @spec start_link () -> {ok, Pid} | ignore | {error, Error}
+%% Start simulation
 %% @end
 %%--------------------------------------------------------------------
+-spec sim_start () -> ok.
+
 sim_start () ->
     gen_server:cast (?MODULE, sim_start).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Tmp
-%%
-%% @spec start_link () -> {ok, Pid} | ignore | {error, Error}
+%% Stop simulation
 %% @end
 %%--------------------------------------------------------------------
+-spec sim_stop () -> ok.
+
 sim_stop () ->
     gen_server:cast (?MODULE, sim_stop).
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server
-%%
-%% @spec init (Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
+%% Initializes the server with new Stimulus
 %% @end
 %%--------------------------------------------------------------------
+-spec init ([]) -> {ok, #state{}}.
+
 init ([]) ->
-    {ok, #state{}}.
+    {ok, #state{stimulus = vnn_stimulus:start ()}}.
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
 %% Handling call messages
-%%
-%% @spec handle_call (Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+-spec handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) ->
+    {reply, Reply :: term(), NewState :: #state{}}                        |
+    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
+    {noreply, NewState :: #state{}}                                       |
+    {noreply, NewState :: #state{}, timeout() | hibernate}                |
+    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}}       |
+    {stop, Reason :: term(), NewState :: #state{}}.
+
 handle_call (_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -73,19 +81,19 @@ handle_call (_Request, _From, State) ->
 %% @private
 %% @doc
 %% Handling cast messages
-%%
-%% @spec handle_cast (Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast (sim_start, _State) ->
-    lager:debug ("sim_start"),
-    {noreply, #state{status = false}, 1000};
+-spec handle_cast(sim_start | sim_stop, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
 
-handle_cast (sim_stop, _State) ->
+handle_cast (sim_start, #state{stimulus = Stimulus} = State) ->
+    lager:debug ("sim_start"),
+    [Pid ! sim_start || Pid <- Stimulus],
+    {noreply, State};
+
+handle_cast (sim_stop, #state{stimulus = Stimulus} = State) ->
     lager:debug ("sim_stop"),
-    {noreply, #state{}}.
+    [Pid ! sim_stop || Pid <- Stimulus],
+    {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -97,10 +105,13 @@ handle_cast (sim_stop, _State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info (timeout, #state{status = Status}) ->
-    Val = case Status of true -> 1; false -> 0 end,
-    vnn_event:send_event (Val),
-    {noreply, #state{status = not Status}, random:uniform (100) + 50}.
+-spec handle_info (timeout, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
+
+handle_info (timeout, State) ->
+    %% Val = case Status of true -> 1; false -> 0 end,
+    %% vnn_event:send_event (Val),
+    %% {noreply, #state{status = not Status}, random:uniform (100) + 50}.
+    {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -109,10 +120,11 @@ handle_info (timeout, #state{status = Status}) ->
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
-%%
-%% @spec terminate (Reason, State) -> void ()
 %% @end
 %%--------------------------------------------------------------------
+-spec terminate (Reason :: (normal | shutdown | {shutdown, term ()} | term ()),
+                 State :: term()) -> term().
+
 terminate (_Reason, _State) ->
     ok.
 
@@ -120,9 +132,24 @@ terminate (_Reason, _State) ->
 %% @private
 %% @doc
 %% Convert process state when code is changed
-%%
-%% @spec code_change (OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
+-spec code_change(OldVsn :: (term () | {down, term ()}), State :: term (), Extra :: term ()) ->
+    {ok, #state{}} |
+    {error, Reason :: term ()}.
+
 code_change (_OldVsn, State, _Extra) ->
     {ok, State}.
+
+%%--------------------------------------------------------------------
+%% Tests
+%%--------------------------------------------------------------------
+-ifdef(TEST).
+-include_lib ("eunit/include/eunit.hrl").
+
+init_test () ->
+    {ok, #state{stimulus = Stimulus}} = init ([]),
+    ?assert (is_list (Stimulus)),
+    ?assert (is_pid (hd (Stimulus))).
+
+-endif.

@@ -5,10 +5,19 @@ var Menubar = function (sig)
 
     menubar.add (function ()
     {
+        var stimulusMenu = new UI.Panel ({clazz: "menu"})
+        stimulusMenu.add (new UI.Panel ({clazz: "title", text: "Stimulus"}))
+        var options = new UI.Panel ({clazz: "options"})
+        stimulusMenu.add (options)
+        var helloWorldOption = new UI.Panel ({clazz: "option", text: String.fromCharCode (10004) + " Hello World"})
+        options.add (helloWorldOption)
+        return stimulusMenu
+    } ())
+
+    menubar.add (function ()
+    {
         var simulationMenu = new UI.Panel ({ clazz: "menu" })
-
         simulationMenu.add (new UI.Panel ({ clazz: "title", text: "Simulation" }))
-
         var options = new UI.Panel ({ clazz: "options" })
         simulationMenu.add (options)
 

@@ -4,24 +4,37 @@ function Viewport (sig)
 
     if (!Detector.webgl) Detector.addGetWebGLMessage ()
 
+    var stimulus = new THREE.Geometry ()
+    for (var i = 0; i < 800; i++)
+    {
+        stimulus.vertices[i] = new THREE.Vector3 ()
+        stimulus.colors[i] = new THREE.Color ()
+    }
     var geometry = new THREE.Geometry ()
+    var geometry2 = new THREE.Geometry ()
     var colors = []
     var count = 0
-    sig.wsMsgReceived.add (function (data)
+    sig.wsMsgReceived.add (function (buffer)
     {
-        var x = new Int32Array (data)
-        var randomIdx = Math.floor (Math.random () * (count + 1))
-        if (data && x[0] == 1) colors[randomIdx].set (0xffffff)
-        else                   colors[randomIdx].set (0x000000)
-        geometry.colorsNeedUpdate = true
+        var type = new Uint32Array (buffer, 0, 1) [0]
+
+        if (type == 0) // Stimulus
+        {
+            var id = new Uint32Array (buffer, 4, 1) [0]
+            var x = new Float32Array (buffer,  8, 1) [0]
+            var y = new Float32Array (buffer, 12, 1) [0]
+            var z = new Float32Array (buffer, 16, 1) [0]
+
+            stimulus.vertices[id] = new THREE.Vector3 (x, y, z)
+            stimulus.colors[id] = new THREE.Color (0xffffff)
+            stimulus.verticesNeedUpdate = true
+            stimulus.colorsNeedUpdate = true
+        }
     })
 
     var sceneHelpers = new THREE.Scene ()
 
     var step = 20
-    var inputGrid = new THREE.GridHelper (200, step)
-    inputGrid.position.y = -300
-    sceneHelpers.add (inputGrid)
 
     var outputGrid = new THREE.GridHelper (200, step)
     outputGrid.position.y = 300
@@ -29,21 +42,23 @@ function Viewport (sig)
 
     var scene = new THREE.Scene ()
     scene.fog = new THREE.FogExp2 (0x000000, 0.001)
+
+    scene.add (function () // Stimulus
+    {
+        var sprite = THREE.ImageUtils.loadTexture ("textures/ball.png")
+        var material = new THREE.ParticleBasicMaterial ({size: 20, map: sprite, vertexColors: true, alphaTest: 0.5})
+        return new THREE.ParticleSystem (stimulus, material)
+    } ())
+
     scene.add (function ()
     {
         var sprite = THREE.ImageUtils.loadTexture ("textures/ball.png")
 
-        for (var y = -300; y <= 300; y += 600)
-            for (var x = -10*step + step/2; x < 10*step; x += step)
-                for (var z = -10*step + step/2; z < 10*step; z += step)
-                {
-                    geometry.vertices.push (new THREE.Vector3 (x, y, z))
-                    colors[count++] = new THREE.Color (0xffffff)
-                }
-
-        for (var i = 0; i < 1000; i++)
+        for (var i = 0; i < 100; i++)
         {
-            geometry.vertices.push (new THREE.Vector3 (Math.random () * 380 - 190, Math.random () * 580 - 290, Math.random () * 380 - 190))
+            var vertex = new THREE.Vector3 (Math.random () * 380 - 190, Math.random () * 580 - 290, Math.random () * 380 - 190)
+            geometry.vertices.push (vertex)
+            geometry2.vertices.push (vertex)
             colors[count++] = new THREE.Color (0xffffff)
         }
 
@@ -52,6 +67,27 @@ function Viewport (sig)
 
         return new THREE.ParticleSystem (geometry, material)
     } ())
+
+    scene.add (function ()
+    {
+        var lineMaterial = new THREE.LineBasicMaterial ({color: 0x000000, linewidth: 1})
+        return new THREE.Line (geometry2, lineMaterial, THREE.LinePieces)
+    } ())
+
+    // test segment
+    var segmentGeometry = new THREE.Geometry ()
+    var white = new THREE.Color (0xfff92e)
+    segmentGeometry.vertices.push (new THREE.Vector3 (300, 0, 0))
+    segmentGeometry.vertices.push (new THREE.Vector3 (300, 100, 0))
+    segmentGeometry.vertices.push (new THREE.Vector3 (300, 100, 0))
+    segmentGeometry.vertices.push (new THREE.Vector3 (300, 200, 0))
+    segmentGeometry.colors.push (new THREE.Color (0x000000))
+    segmentGeometry.colors.push (new THREE.Color (0x000000))
+    segmentGeometry.colors.push (new THREE.Color (0x000000))
+    segmentGeometry.colors.push (new THREE.Color (0x000000))
+    var lineMaterial = new THREE.LineBasicMaterial({vertexColors: THREE.VertexColors})
+    var lineSegment = new THREE.Line (segmentGeometry, lineMaterial, THREE.LinePieces)
+    scene.add (lineSegment)
 
     var camera = new THREE.PerspectiveCamera (70, viewport.dom.offsetWidth / viewport.dom.offsetHeight, 1, 5000)
     camera.position.set (500, 250, 500)
@@ -71,9 +107,18 @@ function Viewport (sig)
     renderer.autoClear = false
     viewport.dom.appendChild (renderer.domElement)
 
-    ;(function animate ()
+    ;(function animate (timestamp)
     {
         requestAnimationFrame (animate)
+
+        if (timestamp)
+        {
+            segmentGeometry.colors[0].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500) + 1) / 2))
+            segmentGeometry.colors[1].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI/2) + 1) / 2))
+            segmentGeometry.colors[2].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI/2) + 1) / 2))
+            segmentGeometry.colors[3].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI) + 1) / 2))
+            segmentGeometry.colorsNeedUpdate = true
+        }
 
         controls.update ()
 
