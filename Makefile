@@ -30,7 +30,7 @@ run_debug: compile
 	erl $(EBINS) -eval 'application:start (lager), lager:set_loglevel (lager_console_backend, debug), application:start (visual_nn).'
 
 test:
-	rebar skip_deps=true eunit $(TEST_CASE)
+	rebar skip_deps=true compile eunit $(TEST_CASE)
 
 deps_plt: deps/yaws
 	sed -i -e 's/no_debug_info/debug_info/' deps/yaws/rebar.config
@@ -50,7 +50,6 @@ typer:
 clean:
 	rebar skip_deps=true clean
 
-clean_all:
-	rebar skip_deps=true clean
+clean_all: clean
 	rm -f deps_plt README.html report.log
-	rm -rf ebin/ doc/ log/
+	rm -rf ebin/ doc/ log/ priv/

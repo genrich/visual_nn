@@ -107,4 +107,7 @@ spawn_test () ->
     ?assertEqual ({190.0, -300.0, 390.0}, position (lists:nth (?STRIDE * ?LINES, Pids))),
     ?assert (is_active (lists:nth (125, Pids))).
 
+nif_test () ->
+    ?assert (vnn_distribution:exponential (1.0) >= 0).
+
 -endif.

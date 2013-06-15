@@ -1,7 +1,9 @@
+c_src/*.o
 deps/
 doc/
 ebin/
 .eunit/
 log/
+priv/
 deps_plt
 report.log
