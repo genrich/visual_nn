@@ -1,6 +1,6 @@
 var CONST =
 {
-    MsgType
+    MsgType:
     {
         Stimulus: 0
     }
