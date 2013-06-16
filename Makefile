@@ -1,10 +1,10 @@
-.PHONY: all doc readme compile shell run run_debug test dialyzer typer clean clean_all
+.PHONY: all doc readme compile shell report run run_debug test dialyzer typer clean clean_all
 
 DEPS=goldrush lager ibrowse yaws
 PLT_APPS=erts kernel stdlib $(DEPS)
 
 PA_DEPS_EBIN=$(DEPS:%=-pa deps/%/ebin)
-EBINS=$(PA_DEPS_EBIN) -pa ebin
+EBINS=$(PA_DEPS_EBIN) -pa ../visual_nn/ebin
 
 all: compile
 
@@ -20,6 +20,11 @@ deps/yaws:
 compile: deps/yaws
 	rebar compile
 
+report: deps/yaws
+	@sed -i 's/%% report,/report,/' rebar.config
+	@rebar skip_deps=true clean compile
+	@sed -i 's/report,/%% report,/' rebar.config
+
 shell: compile
 	erl $(EBINS)
 
@@ -33,7 +38,7 @@ test:
 	rebar skip_deps=true compile eunit $(TEST_CASE)
 
 deps_plt: deps/yaws
-	sed -i -e 's/no_debug_info/debug_info/' deps/yaws/rebar.config
+	sed -i 's/no_debug_info/debug_info/' deps/yaws/rebar.config
 	rebar clean compile
 	rm -f deps/yaws/ebin/mime_type_c.beam
 	rm -f deps/yaws/ebin/yaws_generated.beam

@@ -15,7 +15,7 @@
 
 -record (state, {ws :: #ws_state{}}).
 
--define (STIMULUS, 0).
+-include ("const.hrl").
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -32,6 +32,8 @@ add_handler () ->
 %% Remove event handler
 %% @end
 %%--------------------------------------------------------------------
+-spec delete_handler () -> term () | {error, module_not_found} | {'EXIT', term ()}.
+
 delete_handler () ->
     vnn_event:delete_handler (?MODULE, []).
 
@@ -40,6 +42,8 @@ delete_handler () ->
 %% Remember web socket ref
 %% @end
 %%--------------------------------------------------------------------
+-spec set_ws (WSState :: undefined | #ws_state{}) -> ok.
+
 set_ws (Ws) ->
     ok = gen_event:call (vnn_event, ?MODULE, {set_ws, Ws}).
 
@@ -70,18 +74,27 @@ handle_call({set_ws, Ws}, _State) ->
 %% Handle events
 %% @end
 %%--------------------------------------------------------------------
--spec handle_event ({send_stimulus_pos, Id :: non_neg_integer (), Pos :: vnn_network:position ()}, #state{}) -> {ok, #state{}};
-                   ({send_event, Arg :: term ()}, #state{}) -> {ok, #state{}}.
+-spec handle_event  ({send_stimulus_pos, Id, Pos}, #state{}) -> {ok, #state{}} when
+                        Id :: non_neg_integer (),
+                        Pos :: vnn_network:position ();
+                    ({send_stimulus_spike, Id}, #state{}) -> {ok, #state{}} when
+                        Id :: non_neg_integer ();
+                    ({send_event, term ()}, #state{}) -> {ok, #state{}}.
 
 handle_event (_, #state{ws = undefined} = State) ->
     {ok, State};
 
 handle_event ({send_stimulus_pos, Id, {X, Y, Z}}, #state{ws = Ws} = State) ->
-    [ok] = yaws_api:websocket_send (Ws, {binary, <<?STIMULUS:32/little-unsigned-integer,
-                                                          Id:32/little-unsigned-integer,
-                                                           X:32/little-float,
-                                                           Y:32/little-float,
-                                                           Z:32/little-float>>}),
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?STIMULUS_POS:32/little-unsigned-integer,
+                                                              Id:32/little-unsigned-integer,
+                                                               X:32/little-float,
+                                                               Y:32/little-float,
+                                                               Z:32/little-float>>}),
+    {ok, State};
+
+handle_event ({send_stimulus_spike, Id}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?STIMULUS_SPIKE:32/little-unsigned-integer,
+                                                                Id:32/little-unsigned-integer>>}),
     {ok, State};
 
 handle_event ({send_event, Arg}, #state{ws = Ws} = State) ->

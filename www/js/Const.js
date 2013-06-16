@@ -1,0 +1,5 @@
+var CONST =
+{
+    STIMULUS_POS: 0,
+    STIMULUS_SPIKE: 1,
+}

@@ -1,13 +1,8 @@
-var CONST =
-{
-    MsgType:
-    {
-        Stimulus: 0
-    }
-}
-
 function Viewport (sig)
 {
+    var COLOR_REST = new THREE.Color (0x555555), COLOR_SPIKE = new THREE.Color (0xfff92e)
+    var stimulusColorAttenuation = 0.5
+
     var viewport = new UI.Panel ({clazz: "Viewport"})
 
     if (!Detector.webgl) Detector.addGetWebGLMessage ()
@@ -36,7 +31,7 @@ function Viewport (sig)
     {
         var type = new Uint32Array (buffer, 0, 1) [0]
 
-        if (type == CONST.MsgType.Stimulus)
+        if (type == CONST.STIMULUS_POS)
         {
             var id = new Uint32Array (buffer, 4, 1) [0]
             var x = new Float32Array (buffer, 8,  1) [0]
@@ -48,7 +43,7 @@ function Viewport (sig)
             {
                 geom = new THREE.Geometry ()
                 geom.vertices = cloneFill (stimulus.geometry.vertices, new THREE.Vector3 (0, 0, 10000), reserve (id))
-                geom.colors   = cloneFill (stimulus.geometry.colors,   new THREE.Color (),              reserve (id))
+                geom.colors   = cloneFill (stimulus.geometry.colors,   COLOR_REST,                      reserve (id))
 
                 scene.remove (stimulus)
                 stimulus = new THREE.ParticleSystem (geom, stimulusMaterial)
@@ -59,6 +54,12 @@ function Viewport (sig)
             geom.colors[id] = new THREE.Color (0xffffff)
             geom.verticesNeedUpdate = true
             geom.colorsNeedUpdate   = true
+        }
+        else if (type == CONST.STIMULUS_SPIKE)
+        {
+            var id = new Uint32Array (buffer, 4, 1) [0]
+            stimulus.geometry.colors[id].copy (COLOR_SPIKE)
+            stimulus.geometry.colorsNeedUpdate = true
         }
     })
 
@@ -71,7 +72,7 @@ function Viewport (sig)
     sceneHelpers.add (outputGrid)
 
     var scene = new THREE.Scene ()
-    scene.fog = new THREE.FogExp2 (0x000000, 0.001)
+    scene.fog = new THREE.FogExp2 (0x000000, 0.0007)
 
     scene.add (stimulus)
 
@@ -130,18 +131,41 @@ function Viewport (sig)
     renderer.autoClear = false
     viewport.dom.appendChild (renderer.domElement)
 
+    var lerp = function (color, delta)
+    {
+        if (COLOR_REST.r !== Math.round (color.r) || COLOR_REST.g !== Math.round (color.g) || COLOR_REST.b !== Math.round (color.b))
+        {
+            color.r += (COLOR_REST.r - color.r) * delta;
+            color.g += (COLOR_REST.g - color.g) * delta;
+            color.b += (COLOR_REST.b - color.b) * delta;
+        }
+        else
+        {
+            color.copy (COLOR_REST)
+        }
+    }
+
+    var prevTimestamp = 0
     ;(function animate (timestamp)
     {
-        requestAnimationFrame (animate)
-
         if (timestamp)
         {
+            var delta = (timestamp - prevTimestamp) / 1000
+            prevTimestamp = timestamp
+            if (delta > 1) delta = 0
+
             segmentGeometry.colors[0].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500) + 1) / 2))
             segmentGeometry.colors[1].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI/2) + 1) / 2))
             segmentGeometry.colors[2].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI/2) + 1) / 2))
             segmentGeometry.colors[3].copy (white.clone ().multiplyScalar ((Math.sin (timestamp / 500 + Math.PI) + 1) / 2))
             segmentGeometry.colorsNeedUpdate = true
+
+            var colors = stimulus.geometry.colors
+            for (var i = 0; i < colors.length; i++)
+                lerp (colors[i], delta * stimulusColorAttenuation)
         }
+
+        requestAnimationFrame (animate)
 
         controls.update ()
 

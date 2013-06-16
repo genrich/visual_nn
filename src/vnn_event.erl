@@ -5,7 +5,7 @@
 %%--------------------------------------------------------------------
 -module (vnn_event).
 
--export ([start_link/0, add_handler/2, delete_handler/2, send_event/1, send_stimulus_pos/2]).
+-export ([start_link/0, add_handler/2, delete_handler/2, send_event/1, send_stimulus_pos/2, send_stimulus_spike/1]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -56,3 +56,13 @@ send_event (Arg) ->
 
 send_stimulus_pos (Id, Pos) ->
     gen_event:notify (?MODULE, {send_stimulus_pos, Id, Pos}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Send stimulus spike
+%% @end
+%%--------------------------------------------------------------------
+-spec send_stimulus_spike (Id :: non_neg_integer ()) -> ok.
+
+send_stimulus_spike (Id) ->
+    gen_event:notify (?MODULE, {send_stimulus_spike, Id}).

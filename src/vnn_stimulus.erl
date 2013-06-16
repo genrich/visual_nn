@@ -9,10 +9,14 @@
 
 -include_lib ("lager/include/lager.hrl").
 
--record (state, {network  :: pid (),
-                 id       :: non_neg_integer (),
-                 active   :: boolean (),
-                 position :: vnn_network:position ()}).
+-record (state, {absolute_refractory = 1 :: pos_integer (),
+                 active                  :: boolean (),
+                 id                      :: non_neg_integer (),
+                 network                 :: pid (),
+                 noise_rate = 0.01       :: float (),
+                 position                :: vnn_network:position (),
+                 spike_rate = 0.5        :: float (),
+                 timer_ref               :: reference ()}).
 
 -define (STRIDE, 40).
 -define (LINES,  20).
@@ -61,7 +65,10 @@ start () ->
 %% Start stimulus unit
 %% @end
 %%--------------------------------------------------------------------
--spec start (I :: non_neg_integer (), J :: non_neg_integer (), Active :: boolean ()) -> pid ().
+-spec start (Row, Column, Active) -> pid () when
+      Row    :: non_neg_integer (),
+      Column :: non_neg_integer (),
+      Active :: boolean ().
 
 start (I, J, Active) ->
     erlang:spawn (?MODULE, loop, [#state{network  = self (),
@@ -74,18 +81,50 @@ start (I, J, Active) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
+%% Stimulus message processing loop
 %% @end
 %%--------------------------------------------------------------------
 -spec loop (#state{}) -> no_return ().
 
-loop (#state{network = _NetworkPid, id = Id, active = Active, position = Position} = State) ->
-    receive
-        sim_start -> vnn_event:send_stimulus_pos (Id, Position);
-        sim_stop  -> ok;
-        {is_active, Pid} -> Pid ! Active;
-        {position,  Pid} -> Pid ! Position
+loop (#state{id = Id, position = Position, timer_ref = Timer} = State) ->
+    NewState = receive
+        sim_start ->
+            ok = vnn_event:send_stimulus_pos (Id, Position),
+            NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
+            State#state{timer_ref = NewTimer};
+
+        sim_stop ->
+            case is_reference (Timer) of true  -> erlang:cancel_timer (Timer);
+                                         false -> ok end,
+            State;
+
+        {timeout, Timer, spike} ->
+            ok = vnn_event:send_stimulus_spike (Id),
+            NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
+            State#state{timer_ref = NewTimer};
+
+        {timeout, _, _} ->
+            throw (unexpected_timeout);
+
+        {get_state, Pid} ->
+            Pid ! State,
+            State
     end,
-    vnn_stimulus:loop (State).
+    vnn_stimulus:loop (NewState).
+
+%%--------------------------------------------------------------------
+-spec next_spike_time (#state{}) -> non_neg_integer ().
+
+next_spike_time (#state{absolute_refractory = Refractory, active = Active, noise_rate = NoiseRate, spike_rate = SpikeRate}) ->
+    case Active of
+        true  -> to_millis (vnn_distribution:exponential (SpikeRate)) + Refractory;
+        false -> to_millis (vnn_distribution:exponential (NoiseRate)) + Refractory
+    end.
+
+%%--------------------------------------------------------------------
+-spec to_millis (float ()) -> non_neg_integer ().
+
+to_millis (SecondFraction) -> round (SecondFraction * 1000).
 
 %%--------------------------------------------------------------------
 %% Tests
@@ -93,21 +132,20 @@ loop (#state{network = _NetworkPid, id = Id, active = Active, position = Positio
 -ifdef (TEST).
 -include_lib ("eunit/include/eunit.hrl").
 
-is_active (Pid) -> Pid ! {is_active, self ()}, receive X -> X end.
-
-position (Pid) -> Pid ! {position, self ()}, receive X -> X end.
+get_state (Pid) -> Pid ! {get_state, self ()}, receive X -> X end.
 
 spawn_test () ->
     ?assert (is_pid (start (0, 0, true))),
     Pids = start (),
     ?assertEqual (?STRIDE * ?LINES, length (Pids)),
     ?assert (is_pid (lists:nth (1, Pids))),
-    ?assertNot (is_active (lists:nth (1, Pids))),
-    ?assertEqual ({-190.0, -300.0, -390.0}, position (lists:nth (1, Pids))),
-    ?assertEqual ({190.0, -300.0, 390.0}, position (lists:nth (?STRIDE * ?LINES, Pids))),
-    ?assert (is_active (lists:nth (125, Pids))).
+    ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
+    ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
+    ?assertEqual ({-190.0, -300.0, -390.0}, (get_state (lists:nth (1, Pids)))#state.position),
+    ?assertEqual ({190.0, -300.0, 390.0}, (get_state (lists:nth (?STRIDE * ?LINES, Pids)))#state.position),
+    ?assert ((get_state (lists:nth (125, Pids)))#state.active).
 
 nif_test () ->
-    ?assert (vnn_distribution:exponential (1.0) >= 0).
+    ?assert (vnn_distribution:exponential (1.0) >= 0.0).
 
 -endif.

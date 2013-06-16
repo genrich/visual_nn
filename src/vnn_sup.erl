@@ -1,3 +1,8 @@
+%%--------------------------------------------------------------------
+%% @doc
+%% Root application supervisor
+%% @end
+%%--------------------------------------------------------------------
 -module (vnn_sup).
 
 -export ([start_link/0]).
@@ -5,16 +10,25 @@
 -behaviour (supervisor).
 -export ([init/1]).
 
-%% ===================================================================
-%% API functions
-%% ===================================================================
+-define (SERVER, ?MODULE).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Start root supervisor
+%% @end
+%%--------------------------------------------------------------------
+-spec start_link () -> {ok, pid ()} | ignore | {error, {already_started, pid ()} | {shutdown, term ()} | term ()}.
 
 start_link () ->
-    supervisor:start_link ({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link ({local, ?SERVER}, ?MODULE, []).
 
-%% ===================================================================
-%% Supervisor callbacks
-%% ===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% Initialize supervision tree
+%% @end
+%%--------------------------------------------------------------------
+-spec init ([]) -> {ok, {{one_for_one, non_neg_integer (), non_neg_integer ()},
+                         [{atom (), {atom (), atom (), []}, permanent, non_neg_integer (), worker | supervisor, [atom ()]}]}}.
 
 init ([]) ->
     RestartStrategy = {one_for_one, 3, 60},
