@@ -15,12 +15,12 @@
                  network                 :: pid (),
                  noise_rate = 0.01       :: float (),
                  position                :: vnn_network:position (),
-                 spike_rate = 0.5        :: float (),
+                 spike_rate = 1.0        :: float (),
                  timer_ref               :: reference ()}).
 
 -define (STRIDE, 40).
 -define (LINES,  20).
--define (STEP,   20).
+-define (STEP,   14).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -76,7 +76,7 @@ start (I, J, Active) ->
                                          active   = Active,
                                          position = {I * ?STEP - ?LINES * ?STEP / 2 + ?STEP / 2,
                                                      -300.0,
-                                                     J * ?STEP - ?STRIDE * ?STEP / 2 + ?STEP / 2}}]).
+                                                     (?STRIDE - 1 - J) * ?STEP - ?STRIDE * ?STEP / 2 + ?STEP / 2}}]).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -141,8 +141,8 @@ spawn_test () ->
     ?assert (is_pid (lists:nth (1, Pids))),
     ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
     ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
-    ?assertEqual ({-190.0, -300.0, -390.0}, (get_state (lists:nth (1, Pids)))#state.position),
-    ?assertEqual ({190.0, -300.0, 390.0}, (get_state (lists:nth (?STRIDE * ?LINES, Pids)))#state.position),
+    ?assertEqual ({-133.0, -300.0, 273.0}, (get_state (lists:nth (1, Pids)))#state.position),
+    ?assertEqual ({133.0, -300.0, -273.0}, (get_state (lists:nth (?STRIDE * ?LINES, Pids)))#state.position),
     ?assert ((get_state (lists:nth (125, Pids)))#state.active).
 
 nif_test () ->

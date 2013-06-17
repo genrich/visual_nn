@@ -14,7 +14,9 @@
 
 -type position () :: {number (), number (), number ()}.
 
--record (state, {stimulus :: [pid ()]}).
+-record (state, {segments    :: [pid ()],
+                 time_factor :: float (),
+                 stimulus    :: [pid ()]}).
 
 -include_lib ("lager/include/lager.hrl").
 
