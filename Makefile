@@ -15,10 +15,18 @@ readme:
 	pandoc README.md -o README.html
 
 deps/yaws:
-	rebar get-deps
+	rebar get-deps compile
 
-compile: deps/yaws
-	rebar compile
+www/js/Const.js: include/const.hrl
+	@awk   'BEGIN 		    { print "var CONST =\n{" };                                                      \
+			$$1 ~ /^$$/     { print };                                                                       \
+			$$1 ~ /%%/      { $$1 = "    //"; print $$0 };                                                   \
+			$$1 ~ /-define/ { $$1 = "   "; gsub ("[()]", ""); sub (",", ":"); sub ("\\.", ","); print $$0 }; \
+			END 			{ print "}" }'                                                                   \
+	$^ > $@
+
+compile: deps/yaws www/js/Const.js
+	@rebar skip_deps=true compile
 
 report: deps/yaws
 	@sed -i 's/%% report,/report,/' rebar.config
@@ -35,7 +43,7 @@ run_debug: compile
 	erl $(EBINS) -eval 'application:start (lager), lager:set_loglevel (lager_console_backend, debug), application:start (visual_nn).'
 
 test:
-	rebar skip_deps=true compile eunit $(TEST_CASE)
+	@rebar skip_deps=true eunit $(TEST_CASE)
 
 deps_plt: deps/yaws
 	sed -i 's/no_debug_info/debug_info/' deps/yaws/rebar.config
@@ -46,7 +54,6 @@ deps_plt: deps/yaws
 
 dialyzer: deps_plt
 	rebar compile
-	# --no_check_plt
 	dialyzer --fullpath --plt $^ -Wrace_conditions -r ebin
 
 typer:
@@ -57,4 +64,4 @@ clean:
 
 clean_all: clean
 	rm -f deps_plt README.html report.log
-	rm -rf ebin/ doc/ log/ priv/
+	rm -rf ebin/ deps/ doc/ log/ priv/

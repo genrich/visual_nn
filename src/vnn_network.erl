@@ -15,8 +15,9 @@
 -type position () :: {number (), number (), number ()}.
 
 -record (state, {segments    :: [pid ()],
+                 neurons     :: [pid ()],
                  time_factor :: float (),
-                 stimulus    :: [pid ()]}).
+                 stimuli     :: [pid ()]}).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -53,13 +54,22 @@ sim_stop () ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server with new Stimulus
+%% Initializes the server with new Stimuli and Neurons
 %% @end
 %%--------------------------------------------------------------------
 -spec init ([]) -> {ok, #state{}}.
 
 init ([]) ->
-    {ok, #state{stimulus = vnn_stimulus:start ()}}.
+    Stimuli = vnn_stimulus:start (),
+    Neurons = vnn_segment:start_neurons (),
+    lists:foldl (fun ({Stimulus, Neuron}, Id) -> connect (Stimulus, Neuron, Id), Id + 1 end,
+                 0,
+                 [{Stimulus, Neuron} || Stimulus <- Stimuli, Neuron <- Neurons, random:uniform () =< 0.01]),
+    {ok, #state{stimuli = Stimuli}}.
+
+connect (Stimulus, Neuron, Id) ->
+    Stimulus ! {connect_outbound, Neuron, Id},
+    ok.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -87,14 +97,14 @@ handle_call (_Request, _From, State) ->
 %%--------------------------------------------------------------------
 -spec handle_cast(sim_start | sim_stop, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
 
-handle_cast (sim_start, #state{stimulus = Stimulus} = State) ->
+handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
     lager:debug ("sim_start"),
-    [Pid ! sim_start || Pid <- Stimulus],
+    [Stimulus ! sim_start || Stimulus <- Stimuli],
     {noreply, State};
 
-handle_cast (sim_stop, #state{stimulus = Stimulus} = State) ->
+handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
     lager:debug ("sim_stop"),
-    [Pid ! sim_stop || Pid <- Stimulus],
+    [Stimulus ! sim_stop || Stimulus <- Stimuli],
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -150,8 +160,12 @@ code_change (_OldVsn, State, _Extra) ->
 -include_lib ("eunit/include/eunit.hrl").
 
 init_test () ->
-    {ok, #state{stimulus = Stimulus}} = init ([]),
-    ?assert (is_list (Stimulus)),
-    ?assert (is_pid (hd (Stimulus))).
+    {ok, #state{stimuli = Stimuli}} = init ([]),
+    ?assert (is_list (Stimuli)),
+    ?assert (is_pid (hd (Stimuli))).
+
+connect_test () ->
+    {ok, #state{stimuli = _Stimuli}} = init ([]),
+    ok.
 
 -endif.

@@ -5,7 +5,14 @@
 %%--------------------------------------------------------------------
 -module (vnn_event).
 
--export ([start_link/0, add_handler/2, delete_handler/2, send_event/1, send_stimulus_pos/2, send_stimulus_spike/1]).
+-export ([start_link/0,
+          add_handler/2,
+          delete_handler/2,
+          send_event/1,
+          send_stimulus_pos/2,
+          send_soma_pos/2,
+          send_connection/3,
+          send_stimulus_spike/2]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -62,7 +69,15 @@ send_stimulus_pos (Id, Pos) ->
 %% Send stimulus spike
 %% @end
 %%--------------------------------------------------------------------
--spec send_stimulus_spike (Id :: non_neg_integer ()) -> ok.
+-spec send_stimulus_spike (StimulusId, Connections) -> ok when
+    StimulusId :: non_neg_integer (),
+    Connections :: {ConnectionsCount :: non_neg_integer (), Connections :: []}.
 
-send_stimulus_spike (Id) ->
-    gen_event:notify (?MODULE, {send_stimulus_spike, Id}).
+send_stimulus_spike (Id, Connections) ->
+    gen_event:notify (?MODULE, {send_stimulus_spike, Id, Connections}).
+
+send_soma_pos (Id, Pos) ->
+    gen_event:notify (?MODULE, {send_soma_pos, Id, Pos}).
+
+send_connection (ConnId, FromPosition, ToPosition) ->
+    gen_event:notify (?MODULE, {send_connection, ConnId, FromPosition, ToPosition}).

@@ -9,14 +9,17 @@
 
 -include_lib ("lager/include/lager.hrl").
 
--record (state, {absolute_refractory = 1 :: pos_integer (),
-                 active                  :: boolean (),
-                 id                      :: non_neg_integer (),
-                 network                 :: pid (),
-                 noise_rate = 0.01       :: float (),
-                 position                :: vnn_network:position (),
-                 spike_rate = 1.0        :: float (),
-                 timer_ref               :: reference ()}).
+-record (state, {absolute_refractory = 1            :: pos_integer (),
+                 active                             :: boolean (),
+                 connections_outbound = sets:new () :: set (),
+                 id                                 :: non_neg_integer (),
+                 network                            :: pid (),
+                 noise_rate = 0.01                  :: float (),
+                 position                           :: vnn_network:position (),
+                 simulation                         :: boolean (),
+                 spike_rate = 1.0                   :: float (),
+                 timer_ref                          :: reference (),
+                 time_factor = 1.0                  :: float ()}).
 
 -define (STRIDE, 40).
 -define (LINES,  20).
@@ -71,12 +74,12 @@ start () ->
       Active :: boolean ().
 
 start (I, J, Active) ->
-    erlang:spawn (?MODULE, loop, [#state{network  = self (),
-                                         id       = I * ?STRIDE + J,
-                                         active   = Active,
-                                         position = {I * ?STEP - ?LINES * ?STEP / 2 + ?STEP / 2,
-                                                     -300.0,
-                                                     (?STRIDE - 1 - J) * ?STEP - ?STRIDE * ?STEP / 2 + ?STEP / 2}}]).
+    spawn (?MODULE, loop, [#state{network  = self (),
+                                  id       = I * ?STRIDE + J,
+                                  active   = Active,
+                                  position = {I * ?STEP - ?LINES * ?STEP / 2 + ?STEP / 2,
+                                              -300.0,
+                                              (?STRIDE - 1 - J) * ?STEP - ?STRIDE * ?STEP / 2 + ?STEP / 2}}]).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,40 +89,47 @@ start (I, J, Active) ->
 %%--------------------------------------------------------------------
 -spec loop (#state{}) -> no_return ().
 
-loop (#state{id = Id, position = Position, timer_ref = Timer} = State) ->
+loop (#state{id = StimulusId, position = StimulusPos, connections_outbound = ConnsOut, timer_ref = Timer} = State) ->
     NewState = receive
         sim_start ->
-            ok = vnn_event:send_stimulus_pos (Id, Position),
-            NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
-            State#state{timer_ref = NewTimer};
+            ok = vnn_event:send_stimulus_pos (StimulusId, StimulusPos),
+            sets:fold (fun ({NeuronPid, ConnId}, _) -> NeuronPid ! {send_conn, StimulusPos, ConnId}, {} end, {}, ConnsOut),
+
+            NextSpike = erlang:start_timer (next_spike_time (State), self (), spike),
+            State#state{timer_ref = NextSpike};
 
         sim_stop ->
             case is_reference (Timer) of true  -> erlang:cancel_timer (Timer);
                                          false -> ok end,
+            %% vnn_network:propagate (ConnsOut, sim_stop),
             State;
 
+        {connect_outbound, Neuron, ConnId} ->
+            State#state{connections_outbound = sets:add_element ({Neuron, ConnId}, ConnsOut)};
+
         {timeout, Timer, spike} ->
-            ok = vnn_event:send_stimulus_spike (Id),
+            Connections = sets:fold (fun ({_, ConnId}, Acc) -> [ConnId | Acc] end, [], ConnsOut),
+            ok = vnn_event:send_stimulus_spike (StimulusId, Connections),
             NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
             State#state{timer_ref = NewTimer};
 
-        {timeout, _, _} ->
-            throw (unexpected_timeout);
-
         {get_state, Pid} ->
             Pid ! State,
-            State
+            State;
+
+        Msg ->
+            throw ({unknown_message, Msg})
     end,
     vnn_stimulus:loop (NewState).
 
 %%--------------------------------------------------------------------
 -spec next_spike_time (#state{}) -> non_neg_integer ().
 
-next_spike_time (#state{absolute_refractory = Refractory, active = Active, noise_rate = NoiseRate, spike_rate = SpikeRate}) ->
-    case Active of
-        true  -> to_millis (vnn_distribution:exponential (SpikeRate)) + Refractory;
-        false -> to_millis (vnn_distribution:exponential (NoiseRate)) + Refractory
-    end.
+next_spike_time (#state{active = true, absolute_refractory = Refractory, spike_rate = SpikeRate}) ->
+    to_millis (vnn_distribution:exponential (SpikeRate)) + Refractory;
+
+next_spike_time (#state{active = false, absolute_refractory = Refractory, noise_rate = NoiseRate}) ->
+    to_millis (vnn_distribution:exponential (NoiseRate)) + Refractory.
 
 %%--------------------------------------------------------------------
 -spec to_millis (float ()) -> non_neg_integer ().
