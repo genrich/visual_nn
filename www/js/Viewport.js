@@ -218,6 +218,8 @@ function Viewport (sig)
             for (var connId = 0; connId < connIdMap.length; connId++)
             {
                 var startIdx = connIdMap[connId]
+                if (!startIdx)
+                    continue
                 var coefDelta = (spikeSpeed * delta) / connSegLengths[connId]
 
                 var connSegCount = connSegCounts[connId]
