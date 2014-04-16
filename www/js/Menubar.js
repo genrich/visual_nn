@@ -16,10 +16,9 @@ var Menubar = function (sig)
         var simStatus = 0
         simStartOption.onClick (function  ()
         {
-            if (simStatus == 0 && ws.readyState == 1)
+            if (simStatus == 0)
             {
                 simStatus = 1
-                ws.send (new Int32Array ([simStatus]))
 
                 simStartOption.setClass ("option_disabled")
                 simStopOption.setClass ("option")
@@ -34,7 +33,6 @@ var Menubar = function (sig)
             if (simStatus == 1)
             {
                 simStatus = 0
-                ws.send (new Int32Array ([simStatus]))
 
                 simStartOption.setClass ("option")
                 simStopOption.setClass ("option_disabled")
@@ -42,10 +40,6 @@ var Menubar = function (sig)
             }
         })
         options.add (simStopOption)
-
-        sig.wsOpened.add (function () { simStartOption.setClass ("option") })
-        sig.wsClosed.add (function () { simStartOption.setClass ("option_disabled")
-                                        simStopOption. setClass ("option_disabled")})
 
         return simulationMenu
     } ())
@@ -60,8 +54,8 @@ var Menubar = function (sig)
         var options = new UI.Panel ({ clazz: "options" })
         helpMenu.add (options)
 
-        var option = new UI.Panel ({ clazz: "option", text: "About" })
-        option.onClick (function  () { sig.statusUpdated.dispatch ("About Click") })
+        var option = new UI.Panel ({ clazz: "option", text: "Project home page" })
+        option.onClick (function  () {window.location = 'https://github.com/genrich/visual_nn';});
         options.add (option)
 
         return helpMenu

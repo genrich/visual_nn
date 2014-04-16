@@ -1,86 +1,68 @@
 function Viewport (sig)
 {
-    var viewport = new UI.Panel ({clazz: "Viewport"})
+    var mvMatrix = mat4.create (),
+        pMatrix  = mat4.create ();
 
-    if (!Detector.webgl) Detector.addGetWebGLMessage ()
-
-    var geometry = new THREE.Geometry ()
-    var colors = []
-    var count = 0
-    sig.wsMsgReceived.add (function (data)
+    function spike (time)
     {
-        var x = new Int32Array (data)
-        var randomIdx = Math.floor (Math.random () * (count + 1))
-        if (data && x[0] == 1) colors[randomIdx].set (0xffffff)
-        else                   colors[randomIdx].set (0x000000)
-        geometry.colorsNeedUpdate = true
-    })
+        if (Math.random () < 0.3)
+            nodes.randomSpike (time);
+    }
 
-    var sceneHelpers = new THREE.Scene ()
-
-    var step = 20
-    var inputGrid = new THREE.GridHelper (200, step)
-    inputGrid.position.y = -300
-    sceneHelpers.add (inputGrid)
-
-    var outputGrid = new THREE.GridHelper (200, step)
-    outputGrid.position.y = 300
-    sceneHelpers.add (outputGrid)
-
-    var scene = new THREE.Scene ()
-    scene.fog = new THREE.FogExp2 (0x000000, 0.001)
-    scene.add (function ()
+    function draw (timestamp)
     {
-        var sprite = THREE.ImageUtils.loadTexture ("textures/ball.png")
+        var time = timestamp / 1000.0;
 
-        for (var y = -300; y <= 300; y += 600)
-            for (var x = -10*step + step/2; x < 10*step; x += step)
-                for (var z = -10*step + step/2; z < 10*step; z += step)
-                {
-                    geometry.vertices.push (new THREE.Vector3 (x, y, z))
-                    colors[count++] = new THREE.Color (0xffffff)
-                }
+        spike (time);
 
-        for (var i = 0; i < 1000; i++)
-        {
-            geometry.vertices.push (new THREE.Vector3 (Math.random () * 380 - 190, Math.random () * 580 - 290, Math.random () * 380 - 190))
-            colors[count++] = new THREE.Color (0xffffff)
-        }
+        gl.clear (gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        geometry.colors = colors
-        var material = new THREE.ParticleBasicMaterial ({size: 20, map: sprite, vertexColors: true, alphaTest: 0.5})
+        nodes.drawNodes       (pMatrix, mvMatrix);
+        nodes.drawConnections (pMatrix, mvMatrix);
+        nodes.drawSpikes      (pMatrix, mvMatrix, time);
 
-        return new THREE.ParticleSystem (geometry, material)
-    } ())
-
-    var camera = new THREE.PerspectiveCamera (70, viewport.dom.offsetWidth / viewport.dom.offsetHeight, 1, 5000)
-    camera.position.set (500, 250, 500)
-    camera.lookAt (scene.position)
-
-    var controls = new THREE.TrackballControls (camera, viewport.dom)
+        requestAnimationFrame (draw);
+    }
 
     sig.windowResized.add (function ()
     {
-        camera.aspect = viewport.dom.offsetWidth / viewport.dom.offsetHeight
-        camera.updateProjectionMatrix ()
+        canvas.width  = viewport.dom.clientWidth;
+        canvas.height = viewport.dom.clientHeight;
 
-        renderer.setSize (viewport.dom.offsetWidth, viewport.dom.offsetHeight)
+        mat4.perspective (pMatrix, Math.PI / 4, canvas.width / canvas.height, 1, 10000);
+
+        gl.viewport (0, 0, canvas.width, canvas.height);
     })
 
-    var renderer = new THREE.WebGLRenderer ()
-    renderer.autoClear = false
-    viewport.dom.appendChild (renderer.domElement)
+    var viewport = new UI.Panel ({clazz: 'Viewport'});
 
-    ;(function animate ()
-    {
-        requestAnimationFrame (animate)
+    if (!Detector.webgl)
+        return Detector.addGetWebGLMessage ({ parent: viewport });
 
-        controls.update ()
+    var canvas = document.createElement ('canvas');
+    var gl = canvas.getContext ('webgl');
+    viewport.dom.appendChild (canvas);
 
-        renderer.clear ()
-        renderer.render (scene, camera)
-        renderer.render (sceneHelpers, camera)
-    }) ()
+    var controller = new MouseController (canvas, mvMatrix);
 
-    return viewport
-}
+    var nodes = new Nodes (gl);
+
+    // nodes.set (0, -100, -100, 0); nodes.set (1, -100,  100, 0);
+    // nodes.set (2,  100, -100, 0); nodes.set (3,  100,  100, 0); nodes.set (4, 0, 0, 100);
+    // nodes.connect (0, 4); nodes.connect (1, 4); nodes.connect (2, 4); nodes.connect (3, 4);
+
+    for (var i = 0; i < 100; ++i)
+        nodes.set (i, Math.random () * 500 - 250, Math.random () * 1000 - 500, Math.random () * 500 - 250);
+    for (var i = 0; i < 100; ++i)
+        nodes.connect (nodes.randomNode (), nodes.randomNode ());
+
+    gl.clearColor (0.9, 0.9, 0.9, 1.0);
+    gl.enable (gl.DEPTH_TEST);
+
+    mat4.identity    (mvMatrix);
+    mat4.translate   (mvMatrix, mvMatrix, [0, 0, -1500]);
+
+    requestAnimationFrame (draw);
+
+    return viewport;
+};
