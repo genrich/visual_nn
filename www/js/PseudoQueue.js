@@ -47,10 +47,17 @@ function PseudoQueue () // fifo is not maintained at early array growth
 
     this.size = function ()
     {
-        if (headIdx <= tailIdx)
-            return tailIdx - headIdx + 1;
+        if (is_empty)
+        {
+            return 0;
+        }
         else
-            return array.length - headIdx + tailIdx + 1;
+        {
+            if (headIdx <= tailIdx)
+                return tailIdx - headIdx + 1;
+            else
+                return array.length - headIdx + tailIdx + 1;
+        }
     }
 
     function inc (value)
