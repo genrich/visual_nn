@@ -11,7 +11,7 @@
 
 -record (state, {absolute_refractory = 1            :: pos_integer (),
                  active                             :: boolean (),
-                 connections_outbound = sets:new () :: set (),
+                 connections_outbound = sets:new () :: sets:set (),
                  id                                 :: non_neg_integer (),
                  network                            :: pid (),
                  noise_rate = 0.01                  :: float (),

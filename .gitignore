@@ -7,3 +7,4 @@ log/
 priv/
 deps_plt
 report.log
+*.swp

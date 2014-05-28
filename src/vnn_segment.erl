@@ -8,7 +8,7 @@
 -export ([loop/1, start_neurons/0]).
 
 -record (state, {absolute_refractory = 1            :: pos_integer (),
-                 connections_outbound = sets:new () :: set (),
+                 connections_outbound = sets:new () :: sets:set (),
                  from                               :: pid (),
                  id                                 :: non_neg_integer (),
                  position                           :: vnn_network:position (),
