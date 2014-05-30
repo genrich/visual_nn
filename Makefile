@@ -40,7 +40,7 @@ run: compile
 	erl $(EBINS) -eval 'application:start (visual_nn).'
 
 run_debug: compile
-	erl $(EBINS) -eval 'application:start (lager), lager:set_loglevel (lager_console_backend, debug), application:start (visual_nn).'
+	erl $(EBINS) -eval 'application:start (syntax_tools), application:start (compiler), application:start (goldrush), application:start (lager), lager:set_loglevel (lager_console_backend, debug), application:start (visual_nn).'
 
 test:
 	@rebar skip_deps=true eunit $(TEST_CASE)

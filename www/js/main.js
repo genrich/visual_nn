@@ -1,6 +1,6 @@
 var ws = new WebSocket ("ws://localhost:8080/ws_endpoint.yaws")
 
-window.onload = function ()
+function main ()
 {
     var SIGNALS = window.signals;
 
