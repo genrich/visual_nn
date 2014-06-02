@@ -109,7 +109,7 @@ loop (#state{id = StimulusId, position = StimulusPos, connections_outbound = Con
 
         {timeout, Timer, spike} ->
             Connections = sets:fold (fun ({_, ConnId}, Acc) -> [ConnId | Acc] end, [], ConnsOut),
-            ok = vnn_event:send_stimulus_spike (StimulusId, Connections),
+            ok = vnn_event:send_stimulus_spike (StimulusId),
             NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
             State#state{timer_ref = NewTimer};
 

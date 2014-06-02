@@ -114,11 +114,8 @@ handle_event ({send_connection, ConnId, FromPos, ToPos}, #state{ws = Ws} = State
 %% handle_event ({send_connection, _, _, _}, State) ->
 %%     {ok, State};
 
-handle_event ({send_stimulus_spike, StimulusId, Connections}, #state{ws = Ws} = State) ->
-    {ConnCount, ConnBinary} = lists:foldl (fun (ConnId, {Count, Bin}) ->
-                                               {Count + 1, <<ConnId:32/little, Bin/binary>>} end, {0, <<>>}, Connections),
-    [ok] = yaws_api:websocket_send (Ws, {binary, <<?STIMULUS_SPIKE:32/little, StimulusId:32/little, ConnCount:32/little,
-                                                   ConnBinary/binary>>}),
+handle_event ({send_stimulus_spike, StimulusId}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?STIMULUS_SPIKE:32/little, StimulusId:32/little>>}),
     {ok, State};
 
 handle_event (Event, _) ->

@@ -12,7 +12,7 @@
           send_stimulus_pos/2,
           send_soma_pos/2,
           send_connection/3,
-          send_stimulus_spike/2]).
+          send_stimulus_spike/1]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -69,12 +69,11 @@ send_stimulus_pos (Id, Pos) ->
 %% Send stimulus spike
 %% @end
 %%--------------------------------------------------------------------
--spec send_stimulus_spike (StimulusId, Connections) -> ok when
-    StimulusId :: non_neg_integer (),
-    Connections :: {ConnectionsCount :: non_neg_integer (), Connections :: []}.
+-spec send_stimulus_spike (StimulusId) -> ok when
+    StimulusId :: non_neg_integer ().
 
-send_stimulus_spike (Id, Connections) ->
-    gen_event:notify (?MODULE, {send_stimulus_spike, Id, Connections}).
+send_stimulus_spike (StimulusId) ->
+    gen_event:notify (?MODULE, {send_stimulus_spike, StimulusId}).
 
 send_soma_pos (Id, Pos) ->
     gen_event:notify (?MODULE, {send_soma_pos, Id, Pos}).

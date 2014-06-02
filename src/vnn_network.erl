@@ -61,10 +61,10 @@ sim_stop () ->
 
 init ([]) ->
     Stimuli = vnn_stimulus:start (),
-    Neurons = vnn_segment:start_neurons (),
-    lists:foldl (fun ({Stimulus, Neuron}, Id) -> connect (Stimulus, Neuron, Id), Id + 1 end,
-                 0,
-                 [{Stimulus, Neuron} || Stimulus <- Stimuli, Neuron <- Neurons, random:uniform () =< 0.01]),
+    %% Neurons = vnn_segment:start_neurons (),
+    %% lists:foldl (fun ({Stimulus, Neuron}, Id) -> connect (Stimulus, Neuron, Id), Id + 1 end,
+    %%              0,
+    %%              [{Stimulus, Neuron} || Stimulus <- Stimuli, Neuron <- Neurons, random:uniform () =< 0.01]),
     {ok, #state{stimuli = Stimuli}}.
 
 connect (Stimulus, Neuron, Id) ->

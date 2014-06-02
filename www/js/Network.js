@@ -1,4 +1,4 @@
-function Nodes (gl)
+function Network (gl)
 {
     this.get = function (i)
     {
