@@ -3,6 +3,7 @@ deps/
 doc/
 ebin/
 .eunit/
+.rebar/
 log/
 priv/
 deps_plt

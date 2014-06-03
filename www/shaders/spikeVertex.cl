@@ -5,7 +5,6 @@ attribute float end_time;
 
 uniform mat4 mvMatrix;
 uniform mat4 pMatrix;
-
 uniform float time;
 
 varying float is_discard;

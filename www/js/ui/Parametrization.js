@@ -1,7 +1,7 @@
 function initParametrization (sig)
 {
     var isSimulationRunning = false;
-    var model =
+    var params =
     {
         stimulus: '',
         simulationToggle: function ()
@@ -25,6 +25,6 @@ function initParametrization (sig)
     };
 
     var gui = new dat.GUI ();
-    gui.add (model, 'stimulus', ['HelloWorld']);
-    var simulationControl = gui.add (model, 'simulationToggle').name ('start simulation');
+    gui.add (params, 'stimulus', ['HelloWorld']);
+    var simulationControl = gui.add (params, 'simulationToggle').name ('start simulation');
 }

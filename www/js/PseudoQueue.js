@@ -35,9 +35,9 @@ function PseudoQueue () // fifo is not maintained at early array growth
         }
     }
 
-    this.isNotEmpty = function ()
+    this.isEmpty = function ()
     {
-        return !is_empty;
+        return is_empty;
     }
 
     this.length = function ()
