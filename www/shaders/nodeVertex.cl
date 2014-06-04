@@ -4,7 +4,7 @@ attribute float end_time;
 uniform mat4 mvMatrix;
 uniform mat4 pMatrix;
 uniform float time;
-uniform float duration;
+uniform float attenuation;
 
 varying float spike_strength;
 
@@ -16,7 +16,7 @@ void main (void)
     }
     else
     {
-        float t = (end_time - time) / duration;
+        float t = (end_time - time) / attenuation;
         float t1 = t * t;
         float t2 = t * t;
         spike_strength = t1 * t2;

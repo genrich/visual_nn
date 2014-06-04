@@ -17,11 +17,11 @@
                  timer_ref                          :: reference ()}).
 
 start_neurons () ->
-    [spawn (?MODULE, loop, [#state{id = Id, type = soma,
+    [spawn (?MODULE, loop, [#state{id = vnn_id_pool:id (), type = soma,
                                    position = {-140 + random:uniform (280),
                                                -200 + random:uniform (400),
                                                -280 + random:uniform (560)}}])
-     || Id <- lists:seq (0, 9)].
+     || Count <- lists:seq (0, 9)].
 
 %%--------------------------------------------------------------------
 %% @private
@@ -33,9 +33,9 @@ start_neurons () ->
 
 loop (#state{id = Id, position = Position} = State) ->
     NewState = receive
-        {send_conn, FromPosition, ConnId} ->
-            ok = vnn_event:send_soma_pos (Id, Position),
-            ok = vnn_event:send_connection (ConnId, FromPosition, Position),
+        {send_conn, StimulusId} ->
+            ok = vnn_event:notify_position (Id, Position),
+            ok = vnn_event:notify_connection (StimulusId, Id),
             %% NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
             %% State#state{timer_ref = NewTimer};
             State;

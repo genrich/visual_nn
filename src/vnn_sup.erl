@@ -34,8 +34,10 @@ init ([]) ->
     RestartStrategy = {one_for_one, 3, 60},
     Network = {vnn_network, {vnn_network, start_link, []},
                permanent, 2000, worker, [vnn_network]},
+    IdPool = {vnn_id_pool, {vnn_id_pool, start_link, []},
+              permanent, 2000, worker, [vnn_id_pool]},
     EventManager = {vnn_event, {vnn_event, start_link, []},
                     permanent, 2000, worker, [vnn_event]},
     EmbeddedYaws = {vnn_yaws_sup, {vnn_yaws_sup, start_link, []},
                     permanent, 2000, supervisor, [vnn_yaws_sup]},
-    {ok, {RestartStrategy, [Network, EventManager, EmbeddedYaws]}}.
+    {ok, {RestartStrategy, [IdPool, Network, EventManager, EmbeddedYaws]}}.

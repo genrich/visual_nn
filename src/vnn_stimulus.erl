@@ -75,7 +75,7 @@ start () ->
 
 start (I, J, Active) ->
     spawn (?MODULE, loop, [#state{network  = self (),
-                                  id       = I * ?STRIDE + J,
+                                  id       = vnn_id_pool:id (),
                                   active   = Active,
                                   position = {I * ?STEP - ?LINES * ?STEP / 2 + ?STEP / 2,
                                               -300.0,
@@ -92,8 +92,8 @@ start (I, J, Active) ->
 loop (#state{id = StimulusId, position = StimulusPos, connections_outbound = ConnsOut, timer_ref = Timer} = State) ->
     NewState = receive
         sim_start ->
-            ok = vnn_event:send_stimulus_pos (StimulusId, StimulusPos),
-            sets:fold (fun ({NeuronPid, ConnId}, _) -> NeuronPid ! {send_conn, StimulusPos, ConnId}, {} end, {}, ConnsOut),
+            ok = vnn_event:notify_position (StimulusId, StimulusPos),
+            sets:fold (fun (NeuronPid, _) -> NeuronPid ! {send_conn, StimulusId}, {} end, {}, ConnsOut),
 
             NextSpike = erlang:start_timer (next_spike_time (State), self (), spike),
             State#state{timer_ref = NextSpike};
@@ -104,12 +104,11 @@ loop (#state{id = StimulusId, position = StimulusPos, connections_outbound = Con
             %% vnn_network:propagate (ConnsOut, sim_stop),
             State;
 
-        {connect_outbound, Neuron, ConnId} ->
-            State#state{connections_outbound = sets:add_element ({Neuron, ConnId}, ConnsOut)};
+        {connect, Neuron} ->
+            State#state{connections_outbound = sets:add_element (Neuron, ConnsOut)};
 
         {timeout, Timer, spike} ->
-            Connections = sets:fold (fun ({_, ConnId}, Acc) -> [ConnId | Acc] end, [], ConnsOut),
-            ok = vnn_event:send_stimulus_spike (StimulusId),
+            ok = vnn_event:notify_spike (StimulusId),
             NewTimer = erlang:start_timer (next_spike_time (State), self (), spike),
             State#state{timer_ref = NewTimer};
 

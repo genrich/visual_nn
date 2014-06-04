@@ -8,11 +8,9 @@
 -export ([start_link/0,
           add_handler/2,
           delete_handler/2,
-          send_event/1,
-          send_stimulus_pos/2,
-          send_soma_pos/2,
-          send_connection/3,
-          send_stimulus_spike/1]).
+          notify_position/2,
+          notify_connection/2,
+          notify_spike/1]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -49,34 +47,42 @@ delete_handler (Handler, Args) ->
 %% Send event to be processed by event handlers
 %% @end
 %%--------------------------------------------------------------------
--spec send_event (Arg :: term ()) -> ok.
-
-send_event (Arg) ->
-    gen_event:notify (?MODULE, {send_event, Arg}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Send stimulus position
-%% @end
-%%--------------------------------------------------------------------
--spec send_stimulus_pos (Id :: non_neg_integer (), Pos :: vnn_network:position ()) -> ok.
-
-send_stimulus_pos (Id, Pos) ->
-    gen_event:notify (?MODULE, {send_stimulus_pos, Id, Pos}).
+%% -spec send_event (Arg :: term ()) -> ok.
+%%
+%% send_event (Arg) ->
+%%     gen_event:notify (?MODULE, {send_event, Arg}).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send stimulus spike
+%% Notify node position
 %% @end
 %%--------------------------------------------------------------------
--spec send_stimulus_spike (StimulusId) -> ok when
-    StimulusId :: non_neg_integer ().
+-spec notify_position (Id, Position) -> ok when
+    Id       :: non_neg_integer (),
+    Position :: vnn_network:position ().
 
-send_stimulus_spike (StimulusId) ->
-    gen_event:notify (?MODULE, {send_stimulus_spike, StimulusId}).
+notify_position (Id, Position) ->
+    gen_event:notify (?MODULE, {notify_position, Id, Position}).
 
-send_soma_pos (Id, Pos) ->
-    gen_event:notify (?MODULE, {send_soma_pos, Id, Pos}).
+%%--------------------------------------------------------------------
+%% @doc
+%% Notify nodes connection
+%% @end
+%%--------------------------------------------------------------------
+-spec notify_connection (FromId, ToId) -> ok when
+    FromId :: non_neg_integer (),
+    ToId   :: non_neg_integer ().
 
-send_connection (ConnId, FromPosition, ToPosition) ->
-    gen_event:notify (?MODULE, {send_connection, ConnId, FromPosition, ToPosition}).
+notify_connection (FromId, ToId) ->
+    gen_event:notify (?MODULE, {notify_connection, FromId, ToId}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Notify node spike
+%% @end
+%%--------------------------------------------------------------------
+-spec notify_spike (Id) -> ok when
+      Id :: non_neg_integer ().
+
+notify_spike (Id) ->
+    gen_event:notify (?MODULE, {notify_spike, Id}).

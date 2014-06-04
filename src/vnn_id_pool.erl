@@ -3,21 +3,14 @@
 %% Main module
 %% @end
 %%--------------------------------------------------------------------
--module (vnn_network).
+-module (vnn_id_pool).
 
--export ([start_link/0, sim_start/0, sim_stop/0]).
-
--export_type([position/0]).
+-export ([start_link/0, id/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--type position () :: {number (), number (), number ()}.
-
--record (state, {segments    :: [pid ()],
-                 neurons     :: [pid ()],
-                 time_factor :: float (),
-                 stimuli     :: [pid ()]}).
+-record (state, {last_id = 0 :: non_neg_integer ()}).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -33,23 +26,13 @@ start_link () ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Start simulation
+%% Generate new id
 %% @end
 %%--------------------------------------------------------------------
--spec sim_start () -> ok.
+-spec id () -> Id :: non_neg_integer ().
 
-sim_start () ->
-    gen_server:cast (?MODULE, sim_start).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Stop simulation
-%% @end
-%%--------------------------------------------------------------------
--spec sim_stop () -> ok.
-
-sim_stop () ->
-    gen_server:cast (?MODULE, sim_stop).
+id () ->
+    gen_server:call (?MODULE, id).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -60,18 +43,7 @@ sim_stop () ->
 -spec init ([]) -> {ok, #state{}}.
 
 init ([]) ->
-    Stimuli = vnn_stimulus:start (),
-    Neurons = vnn_segment:start_neurons (),
-    lists:foldl (fun ({StimulusPid, NeuronPid}, _) -> connect (StimulusPid, NeuronPid), {} end,
-                 {},
-                 [{StimulusPid, NeuronPid} || StimulusPid <- Stimuli, NeuronPid <- Neurons, random:uniform () =< 0.01]),
-    {ok, #state{stimuli = Stimuli}}.
-
--spec connect (StimulusPid :: pid (), NeuronPid :: pid ()) -> ok.
-
-connect (StimulusPid, NeuronPid) ->
-    StimulusPid ! {connect, NeuronPid},
-    ok.
+    {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -79,17 +51,11 @@ connect (StimulusPid, NeuronPid) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) ->
-    {reply, Reply :: term(), NewState :: #state{}}                        |
-    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-    {noreply, NewState :: #state{}}                                       |
-    {noreply, NewState :: #state{}, timeout() | hibernate}                |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}}       |
-    {stop, Reason :: term(), NewState :: #state{}}.
+-spec handle_call(id, _From, State :: #state{}) ->
+    {reply, NewId :: non_neg_integer (), NewState :: #state{}}.
 
-handle_call (_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+handle_call (id, _From, #state{last_id = Id} = State) ->
+    {reply, Id, State#state{last_id = Id + 1}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -97,16 +63,9 @@ handle_call (_Request, _From, State) ->
 %% Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(sim_start | sim_stop, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
+-spec handle_cast(_, #state{}) -> {noreply, #state{}}.
 
-handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
-    lager:debug ("sim_start"),
-    [Stimulus ! sim_start || Stimulus <- Stimuli],
-    {noreply, State};
-
-handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
-    lager:debug ("sim_stop"),
-    [Stimulus ! sim_stop || Stimulus <- Stimuli],
+handle_cast (_, State) ->
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -119,12 +78,9 @@ handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info (timeout, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
+-spec handle_info (_, #state{}) -> {noreply, #state{}}.
 
-handle_info (timeout, State) ->
-    %% Val = case Status of true -> 1; false -> 0 end,
-    %% vnn_event:send_event (Val),
-    %% {noreply, #state{status = not Status}, random:uniform (100) + 50}.
+handle_info (_, State) ->
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -154,20 +110,3 @@ terminate (_Reason, _State) ->
 
 code_change (_OldVsn, State, _Extra) ->
     {ok, State}.
-
-%%--------------------------------------------------------------------
-%% Tests
-%%--------------------------------------------------------------------
--ifdef(TEST).
--include_lib ("eunit/include/eunit.hrl").
-
-init_test () ->
-    {ok, #state{stimuli = Stimuli}} = init ([]),
-    ?assert (is_list (Stimuli)),
-    ?assert (is_pid (hd (Stimuli))).
-
-connect_test () ->
-    {ok, #state{stimuli = _Stimuli}} = init ([]),
-    ok.
-
--endif.
