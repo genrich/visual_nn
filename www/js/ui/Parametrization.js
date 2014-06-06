@@ -21,10 +21,16 @@ function initParametrization (sig)
                 simulationControl.name ('stop simulation').updateDisplay ();
             }
             isSimulationRunning = !isSimulationRunning;
-        }
+        },
+        help: function ()
+        {
+            $.notify ('Navigation with mouse:\nOrbit - left mouse\nMove in/out - middle mouse\nPan - right mouse\nZoom - mousewheel',
+                      {className: 'info', autoHideDelay: 15000});
+        },
     };
 
     var gui = new dat.GUI ();
     gui.add (params, 'stimulus', ['HelloWorld']);
     var simulationControl = gui.add (params, 'simulationToggle').name ('start simulation');
+    gui.add (params, 'help');
 }

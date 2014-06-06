@@ -1,5 +1,21 @@
 function initViewport (sig)
 {
+    var viewport = $('#viewport')[0];
+    var canvas   = $('#canvas')  [0];
+
+    var gl = canvas.getContext ('webgl');
+
+    gl.clearColor (0.7, 0.7, 0.7, 1.0);
+    gl.enable (gl.DEPTH_TEST);
+
+    var mvMatrix = mat4.create (), pMatrix = mat4.create ();
+
+    initController (canvas, mvMatrix);
+
+    var network = new Network (gl);
+
+    requestAnimationFrame (draw);
+
     function draw (timestamp)
     {
         var time = timestamp / 1000.0;
@@ -41,26 +57,6 @@ function initViewport (sig)
         }
     })
 
-    var viewport = $('#viewport')[0];
-    var canvas   = $('#canvas')  [0];
-
-	if (webGLIsNotSupported ())
-    {
-        $('#viewport').html ("<div style='height:100%; width:100%; display:table;'>"
-                + "<div style='display:table-cell; vertical-align:middle; text-align:center;'>"
-                + "Your browser doesn't support <a href='http://caniuse.com/webgl'>WebGL</a></div></div>");
-        throw 'WebGL not supported!';
-    }
-
-    var gl = canvas.getContext ('webgl');
-
-    gl.clearColor (0.7, 0.7, 0.7, 1.0);
-    gl.enable (gl.DEPTH_TEST);
-
-    var mvMatrix = mat4.create (), pMatrix = mat4.create ();
-    mat4.identity  (mvMatrix);
-    mat4.translate (mvMatrix, mvMatrix, [0, 0, -1500]);
-
     sig.windowResized.add (function ()
     {
         canvas.width  = viewport.clientWidth;
@@ -70,9 +66,11 @@ function initViewport (sig)
         gl.viewport (0, 0, canvas.width, canvas.height);
     });
 
-    initController (canvas, mvMatrix);
-
-    var network = new Network (gl);
-
-    requestAnimationFrame (draw);
+    if (webGLIsNotSupported ())
+    {
+        $('#viewport').html ("<div style='height:100%; width:100%; display:table;'>"
+                + "<div style='display:table-cell; vertical-align:middle; text-align:center;'>"
+                + "Your browser doesn't support <a href='http://caniuse.com/webgl'>WebGL</a></div></div>");
+        throw 'WebGL not supported!';
+    }
 }

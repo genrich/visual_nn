@@ -1,5 +1,59 @@
 function Network (gl)
 {
+    const FLOAT_SIZE = 4, INT_SIZE = 2,
+          SPIKE_ITEM_SIZE = 8, // x1, y1, z1, x2, y2, z3, duration, end_time
+          VEC3_SIZE = 3, // x, y, z
+          NODE_SIZE = 4, // x, y, z, end_time
+          NODE_BYTES = NODE_SIZE * FLOAT_SIZE,
+          NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0,
+          SPIKE_SPEED = 100,
+          REST_COLOR = vec3.fromValues (0.2, 0.2, 0.2), SPIKE_COLOR = vec3.fromValues (0.9, 0.9, 0),
+          SPIKE_ATTENUATION = 3.0;
+
+    // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
+    // nodes = [x, y, z, end_time, ...]
+    var nodes = [], numNodes = 0, nodesArray = new Float32Array (NODE_BUF_INC);
+    var nodeSpikes = new PseudoQueue (); // queue for nodes which are firing
+    // adjacency list, adjacencyList[v_idx] = [u_idx : adjacent_vertex (v_idx), e_idx : corresponding_edge_idx (v_idx, u_idx), ...]
+    var adjacencyList = [];
+    // edge list, edges = [v_idx, u_idx, ...]
+    var edges = [], numEdges = 0; edgesArray = new Uint16Array (EDGE_BUF_INC);
+    // spike array, [pos_start, pos_end, duration, end_time]
+    var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0;
+
+    var nodeProgram       = initProgram (gl, 'node'),
+        connectionProgram = initProgram (gl, 'connection'),
+        spikeProgram      = initProgram (gl, 'spike');
+
+    var heap = new MinBinaryHeap ();
+
+    var nodeBuffer      = gl.createBuffer (),
+        lineIndexBuffer = gl.createBuffer (),
+        spikeBuffer     = gl.createBuffer ();
+
+    nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
+    nodeProgram.time        = gl.getUniformLocation (nodeProgram, 'time');
+    nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
+    nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
+    nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
+
+    connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
+
+    spikeProgram.end_position = gl.getAttribLocation (spikeProgram, 'end_position');
+    spikeProgram.duration     = gl.getAttribLocation (spikeProgram, 'duration');
+    spikeProgram.end_time     = gl.getAttribLocation (spikeProgram, 'end_time');
+    spikeProgram.time        = gl.getUniformLocation (spikeProgram, 'time');
+    spikeProgram.spike_color = gl.getUniformLocation (spikeProgram, 'spike_color');
+
+    gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
+    gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
+
+    gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+    gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
+
+    gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
+    gl.bufferData (gl.ARRAY_BUFFER, spikesArray, gl.DYNAMIC_DRAW);
+
     this.get = function (i)
     {
         var i_start = i * NODE_SIZE;
@@ -330,58 +384,4 @@ function Network (gl)
 
         return program;
     }
-
-    const FLOAT_SIZE = 4, INT_SIZE = 2,
-          SPIKE_ITEM_SIZE = 8, // x1, y1, z1, x2, y2, z3, duration, end_time
-          VEC3_SIZE = 3, // x, y, z
-          NODE_SIZE = 4, // x, y, z, end_time
-          NODE_BYTES = NODE_SIZE * FLOAT_SIZE,
-          NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0,
-          SPIKE_SPEED = 100,
-          REST_COLOR = vec3.fromValues (0.2, 0.2, 0.2), SPIKE_COLOR = vec3.fromValues (0.9, 0.9, 0),
-          SPIKE_ATTENUATION = 3.0;
-
-    // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
-    // nodes = [x, y, z, end_time, ...]
-    var nodes = [], numNodes = 0, nodesArray = new Float32Array (NODE_BUF_INC);
-    var nodeSpikes = new PseudoQueue (); // queue for nodes which are firing
-    // adjacency list, adjacencyList[v_idx] = [u_idx : adjacent_vertex (v_idx), e_idx : corresponding_edge_idx (v_idx, u_idx), ...]
-    var adjacencyList = [];
-    // edge list, edges = [v_idx, u_idx, ...]
-    var edges = [], numEdges = 0; edgesArray = new Uint16Array (EDGE_BUF_INC);
-    // spike array, [pos_start, pos_end, duration, end_time]
-    var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0;
-
-    var nodeProgram       = initProgram (gl, 'node'),
-        connectionProgram = initProgram (gl, 'connection'),
-        spikeProgram      = initProgram (gl, 'spike');
-
-    var heap = new MinBinaryHeap ();
-
-    var nodeBuffer      = gl.createBuffer (),
-        lineIndexBuffer = gl.createBuffer (),
-        spikeBuffer     = gl.createBuffer ();
-
-    nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
-    nodeProgram.time        = gl.getUniformLocation (nodeProgram, 'time');
-    nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
-    nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
-    nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
-
-    connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
-
-    spikeProgram.end_position = gl.getAttribLocation (spikeProgram, 'end_position');
-    spikeProgram.duration     = gl.getAttribLocation (spikeProgram, 'duration');
-    spikeProgram.end_time     = gl.getAttribLocation (spikeProgram, 'end_time');
-    spikeProgram.time        = gl.getUniformLocation (spikeProgram, 'time');
-    spikeProgram.spike_color = gl.getUniformLocation (spikeProgram, 'spike_color');
-
-    gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
-    gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
-
-    gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
-    gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
-
-    gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
-    gl.bufferData (gl.ARRAY_BUFFER, spikesArray, gl.DYNAMIC_DRAW);
 }
