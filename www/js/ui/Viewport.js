@@ -1,18 +1,18 @@
-function initViewport (sig)
+function initViewport (sig, params)
 {
     var viewport = $('#viewport')[0];
     var canvas   = $('#canvas')  [0];
 
     var gl = canvas.getContext ('webgl');
 
-    gl.clearColor (0.7, 0.7, 0.7, 1.0);
+    gl.clearColor (params.clear_color[0], params.clear_color[1], params.clear_color[2], 1.0);
     gl.enable (gl.DEPTH_TEST);
 
     var mvMatrix = mat4.create (), pMatrix = mat4.create ();
 
     initController (canvas, mvMatrix);
 
-    var network = new Network (gl);
+    var network = new Network (gl, params);
 
     requestAnimationFrame (draw);
 
@@ -62,7 +62,7 @@ function initViewport (sig)
         canvas.width  = viewport.clientWidth;
         canvas.height = viewport.clientHeight;
 
-        mat4.perspective (pMatrix, Math.PI / 4, canvas.width / canvas.height, 1, 10000);
+        mat4.perspective (pMatrix, Math.PI / 4, canvas.width / canvas.height, params.near, params.far);
         gl.viewport (0, 0, canvas.width, canvas.height);
     });
 

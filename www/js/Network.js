@@ -1,14 +1,11 @@
-function Network (gl)
+function Network (gl, params)
 {
     const FLOAT_SIZE = 4, INT_SIZE = 2,
           SPIKE_ITEM_SIZE = 8, // x1, y1, z1, x2, y2, z3, duration, end_time
           VEC3_SIZE = 3, // x, y, z
           NODE_SIZE = 4, // x, y, z, end_time
           NODE_BYTES = NODE_SIZE * FLOAT_SIZE,
-          NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0,
-          SPIKE_SPEED = 100,
-          REST_COLOR = vec3.fromValues (0.2, 0.2, 0.2), SPIKE_COLOR = vec3.fromValues (0.9, 0.9, 0),
-          SPIKE_ATTENUATION = 3.0;
+          NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0;
 
     // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
     // nodes = [x, y, z, end_time, ...]
@@ -32,10 +29,13 @@ function Network (gl)
         spikeBuffer     = gl.createBuffer ();
 
     nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
-    nodeProgram.time        = gl.getUniformLocation (nodeProgram, 'time');
-    nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
-    nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
-    nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
+    nodeProgram.time          = gl.getUniformLocation (nodeProgram, 'time');
+    nodeProgram.attenuation   = gl.getUniformLocation (nodeProgram, 'attenuation');
+    nodeProgram.log_far_const = gl.getUniformLocation (nodeProgram, 'log_far_const');
+    nodeProgram.far           = gl.getUniformLocation (nodeProgram, 'far');
+    nodeProgram.clear_color   = gl.getUniformLocation (nodeProgram, 'clear_color');
+    nodeProgram.rest_color    = gl.getUniformLocation (nodeProgram, 'rest_color');
+    nodeProgram.spike_color   = gl.getUniformLocation (nodeProgram, 'spike_color');
 
     connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
 
@@ -119,7 +119,7 @@ function Network (gl)
         if (v_idx < numNodes)
         {
             var i_start = v_idx * NODE_SIZE + 3;
-            nodesArray[i_start] = time + SPIKE_ATTENUATION;
+            nodesArray[i_start] = time + params.spike_attenuation;
 
             nodeSpikes.enqueue (v_idx);
         }
@@ -129,7 +129,7 @@ function Network (gl)
         {
             var u_idx = adjacencyList[v_idx][i];
             var v = this.get (v_idx), u = this.get (u_idx);
-            var duration = vec3.distance (v, u) / SPIKE_SPEED,
+            var duration = vec3.distance (v, u) / params.spike_speed,
                 end_time = time + duration;
 
             newSpikes.push (v[0]); newSpikes.push (v[1]); newSpikes.push (v[2]);
@@ -142,23 +142,22 @@ function Network (gl)
 
     this.drawNodes = function (pMatrix, mvMatrix, time)
     {
-        gl.useProgram (nodeProgram);
-        gl.enableVertexAttribArray (nodeProgram.position);
+        useProgram (nodeProgram, pMatrix, mvMatrix);
         gl.enableVertexAttribArray (nodeProgram.end_time);
 
-        gl.uniformMatrix4fv (nodeProgram.pMatrix,  false, pMatrix);
-        gl.uniformMatrix4fv (nodeProgram.mvMatrix, false, mvMatrix);
-        gl.uniform1f        (nodeProgram.time, time);
-        gl.uniform1f        (nodeProgram.attenuation, SPIKE_ATTENUATION);
-        gl.uniform3fv       (nodeProgram.rest_color,  REST_COLOR);
-        gl.uniform3fv       (nodeProgram.spike_color, SPIKE_COLOR);
+        gl.uniform1f (nodeProgram.time,          time);
+        gl.uniform1f (nodeProgram.attenuation,   params.spike_attenuation);
+        gl.uniform3fv (nodeProgram.rest_color,  params.rest_color);
+        gl.uniform3fv (nodeProgram.spike_color, params.spike_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
 
         while (!nodeSpikes.isEmpty ()) // update buffer data with spike end_time
         {
             var i_start = nodeSpikes.dequeue () * NODE_SIZE + 3;
-            gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, nodesArray.subarray (i_start, i_start + 1));
+            var a = nodesArray.subarray (i_start, i_start + 1);
+            if (a.length)
+                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, a);
         }
 
         if (nodes.length > nodesArray.length) // reallocate
@@ -183,12 +182,9 @@ function Network (gl)
 
     this.drawConnections = function (pMatrix, mvMatrix)
     {
-        gl.useProgram (connectionProgram);
-        gl.enableVertexAttribArray (connectionProgram.position);
+        useProgram (connectionProgram, pMatrix, mvMatrix);
 
-        gl.uniformMatrix4fv (connectionProgram.pMatrix,  false, pMatrix);
-        gl.uniformMatrix4fv (connectionProgram.mvMatrix, false, mvMatrix);
-        gl.uniform3fv       (connectionProgram.rest_color, REST_COLOR);
+        gl.uniform3fv       (connectionProgram.rest_color, params.rest_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
         gl.vertexAttribPointer (connectionProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
@@ -215,16 +211,13 @@ function Network (gl)
 
     this.drawSpikes = function (pMatrix, mvMatrix, time) // draw spike propagation
     {
-        gl.useProgram (spikeProgram);
-        gl.enableVertexAttribArray (spikeProgram.position);
+        useProgram (spikeProgram, pMatrix, mvMatrix);
         gl.enableVertexAttribArray (spikeProgram.end_position);
         gl.enableVertexAttribArray (spikeProgram.duration);
         gl.enableVertexAttribArray (spikeProgram.end_time);
 
-        gl.uniformMatrix4fv (spikeProgram.pMatrix,  false, pMatrix);
-        gl.uniformMatrix4fv (spikeProgram.mvMatrix, false, mvMatrix);
         gl.uniform1f        (spikeProgram.time, time);
-        gl.uniform3fv       (spikeProgram.spike_color, SPIKE_COLOR);
+        gl.uniform3fv       (spikeProgram.spike_color, params.spike_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
@@ -236,6 +229,18 @@ function Network (gl)
         clearExpiredSpikes (time);
 
         gl.drawArrays (gl.POINTS, 0, numSpikes);
+    }
+
+    function useProgram (program, pMatrix, mvMatrix)
+    {
+        gl.useProgram (program);
+        gl.enableVertexAttribArray (program.position);
+
+        gl.uniformMatrix4fv (program.pMatrix,  false, pMatrix);
+        gl.uniformMatrix4fv (program.mvMatrix, false, mvMatrix);
+        gl.uniform1f (program.log_far_const, params.log_far_const);
+        gl.uniform1f (program.far,           params.far);
+        gl.uniform3fv (program.clear_color, params.clear_color);
     }
 
     function clearExpiredSpikes (time)
@@ -377,8 +382,11 @@ function Network (gl)
         if (!gl.getProgramParameter (program, gl.LINK_STATUS))
             throw new Error ('Unable to initialize the shader program.');
 
-        program.pMatrix  = gl.getUniformLocation (program, 'pMatrix');
-        program.mvMatrix = gl.getUniformLocation (program, 'mvMatrix');
+        program.pMatrix       = gl.getUniformLocation (program, 'pMatrix');
+        program.mvMatrix      = gl.getUniformLocation (program, 'mvMatrix');
+        program.log_far_const = gl.getUniformLocation (program, 'log_far_const');
+        program.far           = gl.getUniformLocation (program, 'far');
+        program.clear_color   = gl.getUniformLocation (program, 'clear_color');
 
         program.position = gl.getAttribLocation (program, 'position');
 

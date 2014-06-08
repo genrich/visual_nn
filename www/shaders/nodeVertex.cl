@@ -5,8 +5,11 @@ uniform mat4 mvMatrix;
 uniform mat4 pMatrix;
 uniform float time;
 uniform float attenuation;
+uniform float log_far_const;
+uniform float far;
 
 varying float spike_strength;
+varying float depth;
 
 void main (void)
 {
@@ -22,5 +25,11 @@ void main (void)
         spike_strength = t1 * t2;
     }
     gl_Position = pMatrix * mvMatrix * vec4 (position, 1.0);
-    gl_PointSize = 20.0;
+
+    float w = clamp (gl_Position.w, 0.0, far);
+    depth = log (w * 0.001 + 1.0) / log_far_const;
+
+    gl_PointSize = 12.0 * (1.0 - depth);
+
+    depth = depth * depth;
 }

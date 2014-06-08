@@ -1,141 +1,32 @@
-test ("Single segment, no move test", function()
+test ('Projection matrix test', function ()
 {
-    var connCoef = [], startIdx = 0, connSegCount = 1, iSeg = 0, coefDelta = 0
+    var eye              = vec3.fromValues (-1.1, 0, 0),
+        up               = vec3.fromValues (0, 1, 0),
+        center           = vec3.fromValues (0, 0, 0),
+        mvMatrix         = mat4.create (),
+        pMatrix          = mat4.create (),
+        pmvMatrix        = mat4.create (),
+        tmpVec4,
+        lookOutDirection = vec3.create (),
+        right            = vec3.create ();
 
-    connCoef[0] = 1
-    connCoef[1] = 0
+    var width = 800, height = 600, near = 1, far = 10000;
 
-    processSegment (connCoef, startIdx, connSegCount, iSeg, coefDelta)
+    mat4.perspective (pMatrix, Math.PI / 4, width / height, near, far);
+    mat4.lookAt (mvMatrix, eye, center, up);
+    mat4.mul (pmvMatrix, pMatrix, mvMatrix);
 
-    deepEqual (connCoef, [1, 0])
-})
+    var str = '';
+    str += '[' + pmvMatrix[0] + ' ' + pmvMatrix[4] + ' ' + pmvMatrix[8]  + ' ' +  pmvMatrix[12] + '; ' +
+                 pmvMatrix[1] + ' ' + pmvMatrix[5] + ' ' + pmvMatrix[9]  + ' ' +  pmvMatrix[13] + '; ' +
+                 pmvMatrix[2] + ' ' + pmvMatrix[6] + ' ' + pmvMatrix[10] + ' ' +  pmvMatrix[14] + '; ' +
+                 pmvMatrix[3] + ' ' + pmvMatrix[7] + ' ' + pmvMatrix[11] + ' ' +  pmvMatrix[15] + ']';
 
-test ("Single segment, 0.25 move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 1, iSeg = 0, coefDelta = 0.25
+    // tmpVec4 = vec4.fromValues (x, 0, 0, 1);
+    // vec4.transformMat4 (tmpVec4, tmpVec4, pmvMatrix);
+    // vec4.scale (tmpVec4, tmpVec4, 1/tmpVec4[3]);
+    console.log (str);
+    console.log (mat4.str (pmvMatrix));
 
-    connCoef[0] = 1
-    connCoef[1] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, iSeg, coefDelta)
-
-    deepEqual (connCoef, [0.75, 0.25])
-})
-
-test ("Single segment, 0.75 move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 1, iSeg = 0, coefDelta = 0.75
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, iSeg, coefDelta)
-
-    deepEqual (connCoef, [0.25, 0.75])
-})
-
-test ("Single segment, full move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 1, iSeg = 0, coefDelta = 1
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, iSeg, coefDelta)
-
-    deepEqual (connCoef, [0, 1])
-})
-
-test ("Two segments, 1.25 move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 2, coefDelta = 1.25
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-    connCoef[2] = 0
-    connCoef[3] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0, 0, 0.75, 0.25])
-})
-
-test ("Two segments, 1.75 move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 2, coefDelta = 1.75
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-    connCoef[2] = 0
-    connCoef[3] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0, 0, 0.25, 0.75])
-})
-
-test ("Two segments, full move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 2, coefDelta = 2
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-    connCoef[2] = 0
-    connCoef[3] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0, 0, 0, 1])
-})
-
-test ("Three segments, full move test", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 3, coefDelta = 3
-
-    connCoef[0] = 1
-    connCoef[1] = 0
-    connCoef[2] = 0
-    connCoef[3] = 0
-    connCoef[4] = 0
-    connCoef[5] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 2, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0, 0, 0, 0, 0, 1])
-})
-
-test ("Three segments", function()
-{
-    var connCoef = [], startIdx = 0, connSegCount = 3, coefDelta = 0.5
-
-    connCoef[0] = 0.75
-    connCoef[1] = 0.25
-    connCoef[2] = 0
-    connCoef[3] = 0
-    connCoef[4] = 0
-    connCoef[5] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 2, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0.25, 0.75, 0, 0, 0, 0])
-
-    connCoef[0] = 0.75
-    connCoef[1] = 0.75
-    connCoef[2] = 0
-    connCoef[3] = 0
-    connCoef[4] = 0
-    connCoef[5] = 0
-
-    processSegment (connCoef, startIdx, connSegCount, 2, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 1, coefDelta)
-    processSegment (connCoef, startIdx, connSegCount, 0, coefDelta)
-
-    deepEqual (connCoef, [0.25, 0, 0, 0.25, 0, 0])
-})
+    ok (1 == 1);
+});

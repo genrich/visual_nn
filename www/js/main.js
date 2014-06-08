@@ -25,8 +25,8 @@ function main ()
     sig.wsClosed.add        (function () { notifySuccess ("Connection to server closed");           });
     sig.wsErrorOccurred.add (function () { notifyError   ("Error occurred with server connection"); });
 
-    initParametrization (sig);
-    initViewport (sig);
+    var params = initParametrization (sig);
+    initViewport (sig, params);
 
     var onWindowResize = function () { sig.windowResized.dispatch (); };
     var onWindowClose  = function () { sig.windowClosed. dispatch (); };
