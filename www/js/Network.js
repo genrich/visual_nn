@@ -8,15 +8,14 @@ function Network (gl, params)
           NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0;
 
     // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
-    // nodes = [x, y, z, end_time, ...]
-    var nodes = [], numNodes = 0, nodesArray = new Float32Array (NODE_BUF_INC);
-    var nodeSpikes = new PseudoQueue (); // queue for nodes which are firing
+    // nodesArray = [x, y, z, end_time, ...]
+    var numNodes = 0, nodesArray = new Float32Array (NODE_BUF_INC), nodesToUpdate = [], isNodesBufferFresh = true, nodeSpikes = [];
     // adjacency list, adjacencyList[v_idx] = [u_idx : adjacent_vertex (v_idx), e_idx : corresponding_edge_idx (v_idx, u_idx), ...]
     var adjacencyList = [];
     // edge list, edges = [v_idx, u_idx, ...]
     var edges = [], numEdges = 0; edgesArray = new Uint16Array (EDGE_BUF_INC);
     // spike array, [pos_start, pos_end, duration, end_time]
-    var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0;
+    var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0, radiatingSpikes = [];
 
     var nodeProgram       = initProgram (gl, 'node'),
         connectionProgram = initProgram (gl, 'connection'),
@@ -24,16 +23,13 @@ function Network (gl, params)
 
     var heap = new MinBinaryHeap ();
 
-    var nodeBuffer      = gl.createBuffer (),
+    var nodesBuffer     = gl.createBuffer (),
         lineIndexBuffer = gl.createBuffer (),
         spikeBuffer     = gl.createBuffer ();
 
     nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
     nodeProgram.time          = gl.getUniformLocation (nodeProgram, 'time');
     nodeProgram.attenuation   = gl.getUniformLocation (nodeProgram, 'attenuation');
-    nodeProgram.log_far_const = gl.getUniformLocation (nodeProgram, 'log_far_const');
-    nodeProgram.far           = gl.getUniformLocation (nodeProgram, 'far');
-    nodeProgram.clear_color   = gl.getUniformLocation (nodeProgram, 'clear_color');
     nodeProgram.rest_color    = gl.getUniformLocation (nodeProgram, 'rest_color');
     nodeProgram.spike_color   = gl.getUniformLocation (nodeProgram, 'spike_color');
 
@@ -45,7 +41,7 @@ function Network (gl, params)
     spikeProgram.time        = gl.getUniformLocation (spikeProgram, 'time');
     spikeProgram.spike_color = gl.getUniformLocation (spikeProgram, 'spike_color');
 
-    gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
+    gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
     gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
 
     gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
@@ -57,25 +53,28 @@ function Network (gl, params)
     this.get = function (i)
     {
         var i_start = i * NODE_SIZE;
-        return vec3.fromValues (nodes[i_start], nodes[i_start + 1], nodes[i_start + 2]);
+        return vec3.fromValues (nodesArray[i_start], nodesArray[i_start + 1], nodesArray[i_start + 2]);
     }
 
     this.set = function (i, x, y, z)
     {
-        var i_start = i       * NODE_SIZE;
-        var i_end   = i_start + NODE_SIZE;
-        nodes[i_start]     = x;
-        nodes[i_start + 1] = y;
-        nodes[i_start + 2] = z;
-        nodes[i_start + 3] = 0;
+        var i_start = i * NODE_SIZE;
+
+        if (numNodes <= i)
+        {
+            numNodes = i + 1;
+            nodesArray = reallocateArray (nodesArray, i_start + NODE_SIZE + NODE_BUF_INC);
+            isNodesBufferFresh = false;
+        }
+
+        nodesArray[i_start]     = x;
+        nodesArray[i_start + 1] = y;
+        nodesArray[i_start + 2] = z;
+        nodesArray[i_start + 3] = 0;
+
+        nodesToUpdate.push (i);
 
         if (adjacencyList[i] === undefined) adjacencyList[i] = [];
-
-        if (i_end <= nodesArray.length)
-            updateVertexData (i_start, i_end, x, y, z);
-
-        if (i >= numNodes)
-            numNodes = i + 1;
     }
 
     function prefill (id1, id2)
@@ -121,10 +120,9 @@ function Network (gl, params)
             var i_start = v_idx * NODE_SIZE + 3;
             nodesArray[i_start] = time + params.spike_attenuation;
 
-            nodeSpikes.enqueue (v_idx);
+            nodeSpikes.push (v_idx);
         }
 
-        var newSpikes = [];
         for (var i = 0; i < adjacencyList[v_idx].length; i += 2)
         {
             var u_idx = adjacencyList[v_idx][i];
@@ -132,12 +130,8 @@ function Network (gl, params)
             var duration = vec3.distance (v, u) / params.spike_speed,
                 end_time = time + duration;
 
-            newSpikes.push (v[0]); newSpikes.push (v[1]); newSpikes.push (v[2]);
-            newSpikes.push (u[0]); newSpikes.push (u[1]); newSpikes.push (u[2]);
-            newSpikes.push (duration);
-            newSpikes.push (end_time);
+            radiatingSpikes.push (v[0], v[1], v[2], u[0], u[1], u[2], duration, end_time);
         }
-        updateSpikesArray (newSpikes);
     }
 
     this.drawNodes = function (pMatrix, mvMatrix, time)
@@ -145,35 +139,37 @@ function Network (gl, params)
         useProgram (nodeProgram, pMatrix, mvMatrix);
         gl.enableVertexAttribArray (nodeProgram.end_time);
 
-        gl.uniform1f (nodeProgram.time,          time);
-        gl.uniform1f (nodeProgram.attenuation,   params.spike_attenuation);
+        gl.uniform1f (nodeProgram.time,        time);
+        gl.uniform1f (nodeProgram.attenuation, params.spike_attenuation);
         gl.uniform3fv (nodeProgram.rest_color,  params.rest_color);
         gl.uniform3fv (nodeProgram.spike_color, params.spike_color);
 
-        gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
+        gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
 
-        while (!nodeSpikes.isEmpty ()) // update buffer data with spike end_time
+        if (isNodesBufferFresh)
         {
-            var i_start = nodeSpikes.dequeue () * NODE_SIZE + 3;
+            while (nodesToUpdate.length)
+            {
+                var i_start = nodesToUpdate.pop () * NODE_SIZE;
+
+                var nodesSubArray = nodesArray.subarray (i_start, i_start + NODE_SIZE);
+                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, nodesSubArray);
+            }
+        }
+        else
+        {
+            gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
+            isNodesBufferFresh = true;
+        }
+
+        while (nodeSpikes.length) // update buffer data with spike end_time
+        {
+            var i_start = nodeSpikes.pop () * NODE_SIZE + 3;
             var a = nodesArray.subarray (i_start, i_start + 1);
             if (a.length)
                 gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, a);
         }
 
-        if (nodes.length > nodesArray.length) // reallocate
-        {
-            numNodes = nodes.length / NODE_SIZE;
-
-            var i_start = nodesArray.length;
-
-            var a = new Float32Array (nodes.length + NODE_BUF_INC);
-            a.set (nodesArray);
-            nodesArray = a;
-
-            nodesArray.set (nodes.slice (i_start), i_start);
-
-            gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
-        }
         gl.vertexAttribPointer (nodeProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
         gl.vertexAttribPointer (nodeProgram.end_time,         1, gl.FLOAT, false, NODE_BYTES, 12);
 
@@ -186,7 +182,7 @@ function Network (gl, params)
 
         gl.uniform3fv       (connectionProgram.rest_color, params.rest_color);
 
-        gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
+        gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
         gl.vertexAttribPointer (connectionProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
 
         gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
@@ -221,12 +217,13 @@ function Network (gl, params)
 
         gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
+        clearExpiredSpikes (time);
+        updateSpikesArray ();
+
         gl.vertexAttribPointer (spikeProgram.position,     VEC3_SIZE, gl.FLOAT, false, 32, 0);
         gl.vertexAttribPointer (spikeProgram.end_position, VEC3_SIZE, gl.FLOAT, false, 32, 12);
         gl.vertexAttribPointer (spikeProgram.duration,             1, gl.FLOAT, false, 32, 24);
         gl.vertexAttribPointer (spikeProgram.end_time,             1, gl.FLOAT, false, 32, 28);
-
-        clearExpiredSpikes (time);
 
         gl.drawArrays (gl.POINTS, 0, numSpikes);
     }
@@ -245,14 +242,7 @@ function Network (gl, params)
 
     function clearExpiredSpikes (time)
     {
-        // console.log ('heap=' + heap.size ()
-        //              + ' spikes=' + spikesArray.length
-        //              + ' poolLen=' + edgeSpikesPool.length ()
-        //              + ' poolSize=' + edgeSpikesPool.size ()
-        //              + ' numSpikes=' + numSpikes);
-
-        var limit = 0;
-        while (++limit < 100 && heap.isTopExpired (time))
+        while (heap.isTopExpired (time))
         {
             var expiredSpikeIdx = heap.pop ();
 
@@ -263,34 +253,32 @@ function Network (gl, params)
         }
     }
 
-    function updateSpikesArray (spikes)
+    function updateSpikesArray ()
     {
-        gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
-
-        while (!edgeSpikesPool.isEmpty () && spikes.length > 0) // reuse expired spikes
+        while (!edgeSpikesPool.isEmpty () && radiatingSpikes.length) // reuse expired spikes
         {
             var reuseSpikeIdx = edgeSpikesPool.dequeue ();
 
-            var end_time = spikes[spikes.length - 1]; // last spike item component is end_time
+            var end_time = radiatingSpikes[radiatingSpikes.length - 1]; // last spike item component is end_time
             heap.push (end_time, reuseSpikeIdx);
 
             var i_start = reuseSpikeIdx * SPIKE_ITEM_SIZE;
                 i_end   = i_start       + SPIKE_ITEM_SIZE;
-            spikesArray.set (spikes.slice (spikes.length - SPIKE_ITEM_SIZE), i_start);
+            spikesArray.set (radiatingSpikes.slice (radiatingSpikes.length - SPIKE_ITEM_SIZE), i_start);
             gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, spikesArray.subarray (i_start, i_end));
 
-            spikes.length -= SPIKE_ITEM_SIZE;
+            radiatingSpikes.length -= SPIKE_ITEM_SIZE;
         }
 
-        if (spikes.length == 0)
+        if (radiatingSpikes.length == 0)
             return;
 
         var i_start = numSpikes * SPIKE_ITEM_SIZE,
-            i_end   = i_start + spikes.length;
+            i_end   = i_start + radiatingSpikes.length;
 
-        for (var i = 0; i < spikes.length; i += SPIKE_ITEM_SIZE)
+        for (var i = 0; i < radiatingSpikes.length; i += SPIKE_ITEM_SIZE)
         {
-            var end_time = spikes[i + SPIKE_ITEM_SIZE - 1]; // last spike item component is end_time
+            var end_time = radiatingSpikes[i + SPIKE_ITEM_SIZE - 1]; // last spike item component is end_time
             heap.push (end_time, numSpikes++);
         }
 
@@ -300,24 +288,15 @@ function Network (gl, params)
             a.set (spikesArray);
             spikesArray = a;
 
-            spikesArray.set (spikes, i_start);
+            spikesArray.set (radiatingSpikes, i_start);
             gl.bufferData (gl.ARRAY_BUFFER, spikesArray, gl.DYNAMIC_DRAW);
         }
         else
         {
-            spikesArray.set (spikes, i_start);
+            spikesArray.set (radiatingSpikes, i_start);
             gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, spikesArray.subarray (i_start, i_end));
         }
-    }
-
-    function updateVertexData (i_start, i_end, x, y, z)
-    {
-        gl.bindBuffer (gl.ARRAY_BUFFER, nodeBuffer);
-
-        nodesArray.set ([x, y, z], i_start);
-        var nodesSubArray = nodesArray.subarray (i_start, i_end);
-
-        gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, nodesSubArray);
+        radiatingSpikes.length = 0;
     }
 
     function updateLineData (i_start, i_end, from, to)
@@ -328,6 +307,13 @@ function Network (gl, params)
         var linesSubArray = edgesArray.subarray (i_start, i_end);
 
         gl.bufferSubData (gl.ELEMENT_ARRAY_BUFFER, i_start * INT_SIZE, linesSubArray);
+    }
+
+    function reallocateArray (oldArray, newLength)
+    {
+        var newArray = new Float32Array (newLength);
+        newArray.set (oldArray);
+        return newArray;
     }
 
     function makeShader (gl, src, type)
