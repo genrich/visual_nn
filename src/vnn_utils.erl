@@ -3,7 +3,7 @@
 %% Main module
 %% @end
 %%--------------------------------------------------------------------
--module (vnn_id_pool).
+-module (vnn_utils).
 
 -export ([start_link/0, id/0]).
 

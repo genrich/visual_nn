@@ -62,8 +62,9 @@ function Network (gl, params)
 
         if (numNodes <= i)
         {
+            if (nodesArray.length < i_start + NODE_SIZE)
+                nodesArray = reallocateFloatArray (nodesArray, i_start + NODE_SIZE + NODE_BUF_INC);
             numNodes = i + 1;
-            nodesArray = reallocateArray (nodesArray, i_start + NODE_SIZE + NODE_BUF_INC);
             isNodesBufferFresh = false;
         }
 
@@ -146,29 +147,8 @@ function Network (gl, params)
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
 
-        if (isNodesBufferFresh)
-        {
-            while (nodesToUpdate.length)
-            {
-                var i_start = nodesToUpdate.pop () * NODE_SIZE;
-
-                var nodesSubArray = nodesArray.subarray (i_start, i_start + NODE_SIZE);
-                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, nodesSubArray);
-            }
-        }
-        else
-        {
-            gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
-            isNodesBufferFresh = true;
-        }
-
-        while (nodeSpikes.length) // update buffer data with spike end_time
-        {
-            var i_start = nodeSpikes.pop () * NODE_SIZE + 3;
-            var a = nodesArray.subarray (i_start, i_start + 1);
-            if (a.length)
-                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, a);
-        }
+        updateNodes ();
+        updateSpikesEndTime ();
 
         gl.vertexAttribPointer (nodeProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
         gl.vertexAttribPointer (nodeProgram.end_time,         1, gl.FLOAT, false, NODE_BYTES, 12);
@@ -180,7 +160,7 @@ function Network (gl, params)
     {
         useProgram (connectionProgram, pMatrix, mvMatrix);
 
-        gl.uniform3fv       (connectionProgram.rest_color, params.rest_color);
+        gl.uniform3fv (connectionProgram.rest_color, params.rest_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
         gl.vertexAttribPointer (connectionProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
@@ -226,6 +206,37 @@ function Network (gl, params)
         gl.vertexAttribPointer (spikeProgram.end_time,             1, gl.FLOAT, false, 32, 28);
 
         gl.drawArrays (gl.POINTS, 0, numSpikes);
+    }
+
+    function updateNodes ()
+    {
+        if (isNodesBufferFresh)
+        {
+            while (nodesToUpdate.length)
+            {
+                var i_start = nodesToUpdate.pop () * NODE_SIZE;
+
+                var nodesSubArray = nodesArray.subarray (i_start, i_start + NODE_SIZE);
+                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, nodesSubArray);
+            }
+        }
+        else
+        {
+            gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
+            isNodesBufferFresh = true;
+        }
+    }
+
+    function updateSpikesEndTime ()
+    {
+        while (nodeSpikes.length)
+        {
+            var i_start = nodeSpikes.pop () * NODE_SIZE + 3;
+            var a = nodesArray.subarray (i_start, i_start + 1);
+            if (a.length)
+                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, a);
+        }
+
     }
 
     function useProgram (program, pMatrix, mvMatrix)
@@ -284,9 +295,7 @@ function Network (gl, params)
 
         if (i_end > spikesArray.length)
         {
-            var a = new Float32Array (i_end + SPIKE_BUF_INC);
-            a.set (spikesArray);
-            spikesArray = a;
+            spikesArray = reallocateFloatArray (spikesArray, i_end + SPIKE_BUF_INC);
 
             spikesArray.set (radiatingSpikes, i_start);
             gl.bufferData (gl.ARRAY_BUFFER, spikesArray, gl.DYNAMIC_DRAW);
@@ -309,7 +318,7 @@ function Network (gl, params)
         gl.bufferSubData (gl.ELEMENT_ARRAY_BUFFER, i_start * INT_SIZE, linesSubArray);
     }
 
-    function reallocateArray (oldArray, newLength)
+    function reallocateFloatArray (oldArray, newLength)
     {
         var newArray = new Float32Array (newLength);
         newArray.set (oldArray);

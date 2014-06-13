@@ -5,19 +5,19 @@
 %%--------------------------------------------------------------------
 -module (vnn_network).
 
--export ([start_link/0, sim_start/0, sim_stop/0]).
+-export ([start_link/0, sim_start/0, sim_stop/0, createStimulus/5]).
 
--export_type([position/0]).
+-export_type([position/0, node_type/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--type position () :: {number (), number (), number ()}.
+-type position ()  :: {number (), number (), number ()}.
+-type node_type () :: stimulus_active | stimulus | neuron.
 
--record (state, {segments    :: [pid ()],
-                 neurons     :: [pid ()],
-                 time_factor :: float (),
-                 stimuli     :: [pid ()]}).
+
+-record (state, {nodes   :: [pid ()],
+                 stimuli :: [pid ()]}).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -60,18 +60,13 @@ sim_stop () ->
 -spec init ([]) -> {ok, #state{}}.
 
 init ([]) ->
-    Stimuli = vnn_stimulus:start (),
-    Neurons = vnn_segment:start_neurons (),
-    lists:foldl (fun ({StimulusPid, NeuronPid}, _) -> connect (StimulusPid, NeuronPid), {} end,
-                 {},
-                 [{StimulusPid, NeuronPid} || StimulusPid <- Stimuli, NeuronPid <- Neurons, random:uniform () =< 0.01]),
-    {ok, #state{stimuli = Stimuli}}.
+    Stimuli = vnn_stimulus:create (),
+    Layer0 = create_layer (0, 50),
+    Layer4 = create_layer (3, 50),
+    [connect (Stimulus, Node4) || Stimulus <- Stimuli, Node4 <- Layer4, vnn_random:uniform () < 0.001],
+    [connect (Node4, Node0)    || Node4    <- Layer4,  Node0 <- Layer0, vnn_random:uniform () < 0.01],
 
--spec connect (StimulusPid :: pid (), NeuronPid :: pid ()) -> ok.
-
-connect (StimulusPid, NeuronPid) ->
-    StimulusPid ! {connect, NeuronPid},
-    ok.
+    {ok, #state{stimuli = Stimuli, nodes = Stimuli ++ Layer0 ++ Layer4}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -99,9 +94,13 @@ handle_call (_Request, _From, State) ->
 %%--------------------------------------------------------------------
 -spec handle_cast(sim_start | sim_stop, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
 
-handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
+handle_cast (sim_start, #state{stimuli = Stimuli, nodes = Nodes} = State) ->
     lager:debug ("sim_start"),
     [Stimulus ! sim_start || Stimulus <- Stimuli],
+
+    [Node ! notify_position || Node <- Nodes],
+    [Node ! notify_connections || Node <- Nodes],
+
     {noreply, State};
 
 handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
@@ -156,9 +155,44 @@ code_change (_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %%--------------------------------------------------------------------
-%% Tests
+-spec connect (FromPid :: pid (), ToPid :: pid ()) -> ok.
+
+connect (FromPid, ToPid) ->
+    FromPid ! {request_connection_to, ToPid},
+    ok.
+
 %%--------------------------------------------------------------------
--ifdef(TEST).
+-spec create_layer (LayerId :: non_neg_integer (), Count :: pos_integer ()) -> [pid ()].
+
+create_layer (LayerId, Count) when Count > 0 ->
+    [createNeuron (LayerId) || _ <- lists:seq (1, Count)].
+
+%%--------------------------------------------------------------------
+-spec createNeuron (LayerId :: non_neg_integer ()) -> pid ().
+
+createNeuron (LayerId) ->
+    Position = {-140 + vnn_random:uniform (0.0, 280.0),
+                 300 - (LayerId * 100) + vnn_random:normal (0.0, 10.0),
+                -280 + vnn_random:uniform (0.0, 560.0)},
+    spawn (vnn_node, create, [neuron, Position]).
+
+%%--------------------------------------------------------------------
+-spec createStimulus (Stride, Lines, Row, Col, NodeType) -> pid () when
+      Stride   :: non_neg_integer (),
+      Lines    :: non_neg_integer (),
+      Row      :: non_neg_integer (),
+      Col      :: non_neg_integer (),
+      NodeType :: boolean ().
+
+createStimulus (Stride, TotalLines, Row, Col, NodeType) ->
+    Step = 14,
+    Position = {Row * Step - TotalLines * Step / 2 + Step / 2,
+                -300.0,
+                (Stride - 1 - Col) * Step - Stride * Step / 2 + Step / 2},
+    spawn (vnn_node, create, [NodeType, Position]).
+
+%%--------------------------------------------------------------------
+-ifdef (TEST).
 -include_lib ("eunit/include/eunit.hrl").
 
 init_test () ->

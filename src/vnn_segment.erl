@@ -13,15 +13,15 @@
                  id                                 :: non_neg_integer (),
                  position                           :: vnn_network:position (),
                  to                                 :: pid (),
-                 type                               :: dendrite | soma | axon | axon_term,
+                 type                               :: dendrite | soma | axon | axon_term | spine,
                  timer_ref                          :: reference ()}).
 
 start_neurons () ->
-    [spawn (?MODULE, loop, [#state{id = vnn_id_pool:id (), type = soma,
+    [spawn (?MODULE, loop, [#state{id = vnn_utils:id (), type = soma,
                                    position = {-140 + random:uniform (280),
                                                -200 + random:uniform (400),
                                                -280 + random:uniform (560)}}])
-     || Count <- lists:seq (0, 9)].
+     || _ <- lists:seq (0, 9)].
 
 %%--------------------------------------------------------------------
 %% @private
