@@ -5,7 +5,7 @@
 %%--------------------------------------------------------------------
 -module (vnn_utils).
 
--export ([start_link/0, id/0]).
+-export ([start_link/0, id/0, reset_id/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -35,6 +35,16 @@ id () ->
     gen_server:call (?MODULE, id).
 
 %%--------------------------------------------------------------------
+%% @doc
+%% Generate new id
+%% @end
+%%--------------------------------------------------------------------
+-spec reset_id () -> ok.
+
+reset_id () ->
+    gen_server:call (?MODULE, reset_id).
+
+%%--------------------------------------------------------------------
 %% @private
 %% @doc
 %% Initializes the server with new Stimuli and Neurons
@@ -55,7 +65,10 @@ init ([]) ->
     {reply, NewId :: non_neg_integer (), NewState :: #state{}}.
 
 handle_call (id, _From, #state{last_id = Id} = State) ->
-    {reply, Id, State#state{last_id = Id + 1}}.
+    {reply, Id, State#state{last_id = Id + 1}};
+
+handle_call (reset_id, _From, #state{} = State) ->
+    {reply, ok, State#state{last_id = 0}}.
 
 %%--------------------------------------------------------------------
 %% @private

@@ -6,12 +6,20 @@ function initParametrization (sig)
         this.clear_color       = vec3.fromValues (0.7, 0.7, 0.7);
         this.rest_color        = vec3.fromValues (0.2, 0.2, 0.2);
         this.spike_color       = vec3.fromValues (0.9, 0.9, 0);
-        this.spike_speed       = 100;
+        this.spike_speed       = CONST.SPIKE_SPEED;
         this.spike_attenuation = 3.0;
         // perspective projection
         this.near          = 1;
         this.far           = 10000;
         this.log_far_const = Math.log (this.far * 0.001  + 1);
+        // network
+        this.networkRecreate = function ()
+        {
+            sig.wsSend.dispatch (new Int32Array ([CONST.RECREATE_NETWORK]));
+            notifyInfo ('recreating network...');
+            isSimulationRunning = false;
+            simulationControl.name ('start simulation').updateDisplay ();
+        }
         //
         this.stimulus = '';
         // simulation control
@@ -41,8 +49,22 @@ function initParametrization (sig)
     };
 
     var gui = new dat.GUI ();
+    gui.add (params, 'networkRecreate').name ('recreate network');
     gui.add (params, 'stimulus', ['HelloWorld']);
+
     var simulationControl = gui.add (params, 'simulationToggle').name ('start simulation');
+
+    gui.add (params, 'spike_attenuation', 0.1, 15).name ('spike attenuation');
+    var speedCtrl = gui.add (params, 'spike_speed', 10, 150).name ('spike speed');
+    speedCtrl.onFinishChange (function (value)
+    {
+        var buffer = new ArrayBuffer (8);
+        new Uint32Array  (buffer, 0, 1)[0] = CONST.SET_SPIKE_SPEED;
+        new Float32Array (buffer, 4, 1)[0] = value;
+
+        sig.wsSend.dispatch (buffer);
+    });
+
     gui.add (params, 'help');
 
     return params;

@@ -5,7 +5,12 @@
 %%--------------------------------------------------------------------
 -module (vnn_network).
 
--export ([start_link/0, sim_start/0, sim_stop/0, createStimulus/5]).
+-export ([start_link/0,
+          recreate_network/0,
+          sim_start/0,
+          sim_stop/0,
+          set_spike_speed/1,
+          createStimulus/5]).
 
 -export_type([position/0, node_type/0]).
 
@@ -33,6 +38,17 @@ start_link () ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Recreate neural network
+%% @end
+%%--------------------------------------------------------------------
+-spec recreate_network () -> ok.
+
+recreate_network () ->
+    vnn_sup:start_network (),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Start simulation
 %% @end
 %%--------------------------------------------------------------------
@@ -52,6 +68,16 @@ sim_stop () ->
     gen_server:cast (?MODULE, sim_stop).
 
 %%--------------------------------------------------------------------
+%% @doc
+%% Set spike speed param
+%% @end
+%%--------------------------------------------------------------------
+-spec set_spike_speed (Speed :: float ()) -> ok.
+
+set_spike_speed (Speed) ->
+    gen_server:cast (?MODULE, {set_spike_speed, Speed}).
+
+%%--------------------------------------------------------------------
 %% @private
 %% @doc
 %% Initializes the server with new Stimuli and Neurons
@@ -60,13 +86,23 @@ sim_stop () ->
 -spec init ([]) -> {ok, #state{}}.
 
 init ([]) ->
+    lager:debug ("network init"),
+    process_flag (trap_exit, true),
+
+    vnn_event:notify_new_network (),
+
+    vnn_utils:reset_id (),
     Stimuli = vnn_stimulus:create (),
     Layer0 = create_layer (0, 50),
     Layer4 = create_layer (3, 50),
     [connect (Stimulus, Node4) || Stimulus <- Stimuli, Node4 <- Layer4, vnn_random:uniform () < 0.001],
     [connect (Node4, Node0)    || Node4    <- Layer4,  Node0 <- Layer0, vnn_random:uniform () < 0.01],
 
-    {ok, #state{stimuli = Stimuli, nodes = Stimuli ++ Layer0 ++ Layer4}}.
+    Nodes = Stimuli ++ Layer0 ++ Layer4,
+    [Node ! notify_position || Node <- Nodes],
+    [Node ! notify_connections || Node <- Nodes],
+
+    {ok, #state{stimuli = Stimuli, nodes = Nodes}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -92,20 +128,23 @@ handle_call (_Request, _From, State) ->
 %% Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(sim_start | sim_stop, #state{}) -> {noreply, #state{}, timeout ()} | {noreply, #state{}}.
+-spec handle_cast(Msg, State ) -> {noreply, #state{}, timeout ()} | {noreply, #state{}} when
+      Msg   :: sim_start | sim_stop | {set_spike_speed, _},
+      State :: #state{}.
 
-handle_cast (sim_start, #state{stimuli = Stimuli, nodes = Nodes} = State) ->
+handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
     lager:debug ("sim_start"),
     [Stimulus ! sim_start || Stimulus <- Stimuli],
-
-    [Node ! notify_position || Node <- Nodes],
-    [Node ! notify_connections || Node <- Nodes],
 
     {noreply, State};
 
 handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
     lager:debug ("sim_stop"),
     [Stimulus ! sim_stop || Stimulus <- Stimuli],
+    {noreply, State};
+
+handle_cast ({set_spike_speed, Speed}, #state{} = State) ->
+    vnn_params:set_spike_speed (Speed),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -138,7 +177,9 @@ handle_info (timeout, State) ->
 -spec terminate (Reason :: (normal | shutdown | {shutdown, term ()} | term ()),
                  State :: term()) -> term().
 
-terminate (_Reason, _State) ->
+terminate (_Reason, #state{nodes = Nodes}) ->
+    lager:debug ("network terminate"),
+    [exit (Node, shutdown) || Node <- Nodes],
     ok.
 
 %%--------------------------------------------------------------------
@@ -190,18 +231,3 @@ createStimulus (Stride, TotalLines, Row, Col, NodeType) ->
                 -300.0,
                 (Stride - 1 - Col) * Step - Stride * Step / 2 + Step / 2},
     spawn (vnn_node, create, [NodeType, Position]).
-
-%%--------------------------------------------------------------------
--ifdef (TEST).
--include_lib ("eunit/include/eunit.hrl").
-
-init_test () ->
-    {ok, #state{stimuli = Stimuli}} = init ([]),
-    ?assert (is_list (Stimuli)),
-    ?assert (is_pid (hd (Stimuli))).
-
-connect_test () ->
-    {ok, #state{stimuli = _Stimuli}} = init ([]),
-    ok.
-
--endif.

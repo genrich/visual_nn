@@ -100,8 +100,9 @@ handle_event ({notify_connection, FromId, ToId}, #state{ws = Ws} = State) ->
     [ok] = yaws_api:websocket_send (Ws, {binary, <<?CONNECTION:32/little, FromId:32/little, ToId:32/little>>}),
     {ok, State};
 
-%% handle_event ({send_connection, _, _, _}, State) ->
-%%     {ok, State};
+handle_event (notify_new_network, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?NEW_NETWORK:32/little>>}),
+    {ok, State};
 
 handle_event (Event, _) ->
     throw ({unknown_event, Event}).
@@ -135,15 +136,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-%%--------------------------------------------------------------------
-%% Tests
-%%--------------------------------------------------------------------
--ifdef (TEST).
--include_lib ("eunit/include/eunit.hrl").
-
-segments_test () ->
-    A = 4,
-    ?assertEqual (4, A).
-
--endif.

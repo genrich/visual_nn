@@ -62,21 +62,3 @@ create (String, Stride, Lines, Fun) ->
                             ($ , {I,  J,    Strd}) ->                  {Fun (Stride, Lines, I, J, stimulus),         {I, J+1, Strd}} end,
                         {0, 0, Stride}, String),
     Pids.
-
-%%--------------------------------------------------------------------
--ifdef (TEST).
--include_lib ("eunit/include/eunit.hrl").
-
-spawn_test () ->
-    ?assert (1 == 1).
-    %% ?assert (is_pid (start (0, 0, true))),
-    %% Pids = start (),
-    %% ?assertEqual (?STRIDE * ?LINES, length (Pids)),
-    %% ?assert (is_pid (lists:nth (1, Pids))),
-    %% ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
-    %% ?assertNot ((get_state (lists:nth (1, Pids)))#state.active),
-    %% ?assertEqual ({-133.0, -300.0, 273.0}, (get_state (lists:nth (1, Pids)))#state.position),
-    %% ?assertEqual ({133.0, -300.0, -273.0}, (get_state (lists:nth (?STRIDE * ?LINES, Pids)))#state.position),
-    %% ?assert ((get_state (lists:nth (125, Pids)))#state.active).
-
--endif.

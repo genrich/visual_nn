@@ -36,14 +36,13 @@ loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} =
     NewState =
     receive
         spike ->
-            ok = vnn_event:notify_spike (Id),
             spike (State);
 
         sim_start ->
-            spike (State#s{is_simulation = true});
+            generate_stimulus_spike (State#s{is_simulation = true});
 
         sim_stop ->
-            spike (State#s{is_simulation = false});
+            State#s{is_simulation = false};
 
         notify_position ->
             ok = vnn_event:notify_position (Id, Position),
@@ -79,25 +78,33 @@ loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} =
 -define (ABSOLUTE_REFRACTORY, 1).
 -define (NOISE_RATE,          0.01).
 -define (SPIKE_RATE,          1.0).
--define (SPIKE_SPEED,         100.0).
 
 %%--------------------------------------------------------------------
--spec spike (#s{}) -> #s{}.
+-spec generate_stimulus_spike (#s{}) -> #s{}.
 
-spike (#s{type = stimulus_active, is_simulation = true, outbound = Outbound} = State) ->
-    outbound_spikes (Outbound),
+generate_stimulus_spike (#s{type = stimulus_active, is_simulation = true} = State) ->
     NextSpikeTime = to_millis (vnn_random:exponential (?SPIKE_RATE)) + ?ABSOLUTE_REFRACTORY,
     erlang:send_after (NextSpikeTime, self (), spike),
     State;
 
-spike (#s{type = stimulus, is_simulation = true, outbound = Outbound} = State) ->
-    outbound_spikes (Outbound),
+generate_stimulus_spike (#s{type = stimulus, is_simulation = true} = State) ->
     NextSpikeTime = to_millis (vnn_random:exponential (?NOISE_RATE)) + ?ABSOLUTE_REFRACTORY,
     erlang:send_after (NextSpikeTime, self (), spike),
-    State;
+    State.
 
-spike (#s{type = neuron, outbound = Outbound} = State) ->
-    case vnn_random:uniform () < 0.1 of true  -> outbound_spikes (Outbound);
+%%--------------------------------------------------------------------
+-spec spike (#s{}) -> #s{}.
+
+spike (#s{id = Id, type = stimulus_active, is_simulation = true, outbound = Outbound} = State) ->
+    propagate_spikes (Id, Outbound),
+    generate_stimulus_spike (State);
+
+spike (#s{id = Id, type = stimulus, is_simulation = true, outbound = Outbound} = State) ->
+    propagate_spikes (Id, Outbound),
+    generate_stimulus_spike (State);
+
+spike (#s{id = Id, type = neuron, outbound = Outbound} = State) ->
+    case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound);
                                         false -> undefined
     end,
     State;
@@ -109,12 +116,13 @@ spike (#s{} = State) ->
     State.
 
 %%--------------------------------------------------------------------
--spec outbound_spikes (Outbound :: sets:set ()) -> ok.
+-spec propagate_spikes (Id :: non_neg_integer (), Outbound :: sets:set ()) -> ok.
 
-outbound_spikes (Outbound) ->
+propagate_spikes (Id, Outbound) ->
+    ok = vnn_event:notify_spike (Id),
     F = fun (Pid) ->
                 Length = get (Pid),
-                NextSpikeTime = to_millis (Length / ?SPIKE_SPEED) + ?ABSOLUTE_REFRACTORY,
+                NextSpikeTime = to_millis (Length / vnn_params:spike_speed ()) + ?ABSOLUTE_REFRACTORY,
                 erlang:send_after (NextSpikeTime, Pid, spike)
         end,
     [F (To) || To <- sets:to_list (Outbound)],
@@ -135,9 +143,3 @@ length ({X1, Y1, Z1}, {X2, Y2, Z2}) ->
 -spec pow2 (float ()) -> float ().
 
 pow2 (A) -> A * A.
-
-%%--------------------------------------------------------------------
--ifdef (TEST).
--include_lib ("eunit/include/eunit.hrl").
-
--endif.

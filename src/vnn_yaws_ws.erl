@@ -48,14 +48,24 @@ handle_open (WsState, State) ->
 %%--------------------------------------------------------------------
 -spec handle_message ({binary, binary ()}) -> noreply;
                      ({text,   binary ()}) -> noreply;
-                     ({close, RFC6455StatusCode, Reason}) -> noreply when RFC6455StatusCode :: integer (), Reason :: binary ().
+                     ({close, RFC6455StatusCode, Reason}) -> noreply when
+      RFC6455StatusCode :: integer (),
+      Reason            :: binary ().
 
-handle_message ({binary, <<?STOP_SIMULATION:32/little-signed-integer>>}) ->
+handle_message ({binary, <<?RECREATE_NETWORK:32/little>>}) ->
+    vnn_network:recreate_network (),
+    noreply;
+
+handle_message ({binary, <<?START_SIMULATION:32/little>>}) ->
+    vnn_network:sim_start (),
+    noreply;
+
+handle_message ({binary, <<?STOP_SIMULATION:32/little>>}) ->
     vnn_network:sim_stop (),
     noreply;
 
-handle_message ({binary, <<?START_SIMULATION:32/little-signed-integer>>}) ->
-    vnn_network:sim_start (),
+handle_message ({binary, <<?SET_SPIKE_SPEED:32/little, Speed:32/little-float>>}) ->
+    vnn_network:set_spike_speed (Speed),
     noreply;
 
 handle_message ({Type, Data}) ->

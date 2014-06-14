@@ -16,22 +16,22 @@ function Network (gl, params)
     var edges = [], numEdges = 0; edgesArray = new Uint16Array (EDGE_BUF_INC);
     // spike array, [pos_start, pos_end, duration, end_time]
     var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0, radiatingSpikes = [];
+    var heap = new MinBinaryHeap ();
+
 
     var nodeProgram       = initProgram (gl, 'node'),
         connectionProgram = initProgram (gl, 'connection'),
         spikeProgram      = initProgram (gl, 'spike');
-
-    var heap = new MinBinaryHeap ();
 
     var nodesBuffer     = gl.createBuffer (),
         lineIndexBuffer = gl.createBuffer (),
         spikeBuffer     = gl.createBuffer ();
 
     nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
-    nodeProgram.time          = gl.getUniformLocation (nodeProgram, 'time');
-    nodeProgram.attenuation   = gl.getUniformLocation (nodeProgram, 'attenuation');
-    nodeProgram.rest_color    = gl.getUniformLocation (nodeProgram, 'rest_color');
-    nodeProgram.spike_color   = gl.getUniformLocation (nodeProgram, 'spike_color');
+    nodeProgram.time        = gl.getUniformLocation (nodeProgram, 'time');
+    nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
+    nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
+    nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
 
     connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
 
@@ -49,6 +49,17 @@ function Network (gl, params)
 
     gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
     gl.bufferData (gl.ARRAY_BUFFER, spikesArray, gl.DYNAMIC_DRAW);
+
+    this.clear = function ()
+    {
+        numNodes = 0; nodesToUpdate = [];
+        numSpikes = 0; nodeSpikes = [];
+        adjacencyList = [];
+        numEdges = 0; edges = [];
+        edgeSpikesPool = new PseudoQueue ();
+        radiatingSpikes = [];
+        heap = new MinBinaryHeap ();
+    }
 
     this.get = function (i)
     {
@@ -118,8 +129,8 @@ function Network (gl, params)
 
         if (v_idx < numNodes)
         {
-            var i_start = v_idx * NODE_SIZE + 3;
-            nodesArray[i_start] = time + params.spike_attenuation;
+            var i = v_idx * NODE_SIZE + 3;
+            nodesArray[i] = time + params.spike_attenuation;
 
             nodeSpikes.push (v_idx);
         }
@@ -231,10 +242,10 @@ function Network (gl, params)
     {
         while (nodeSpikes.length)
         {
-            var i_start = nodeSpikes.pop () * NODE_SIZE + 3;
-            var a = nodesArray.subarray (i_start, i_start + 1);
+            var i = nodeSpikes.pop () * NODE_SIZE + 3;
+            var a = nodesArray.subarray (i, i + 1);
             if (a.length)
-                gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, a);
+                gl.bufferSubData (gl.ARRAY_BUFFER, i * FLOAT_SIZE, a);
         }
 
     }

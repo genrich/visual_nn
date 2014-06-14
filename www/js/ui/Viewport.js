@@ -55,6 +55,10 @@ function initViewport (sig, params)
             var ids = new Uint32Array (buffer, 4, 2);
             network.connect (ids[0], ids[1]);
         }
+        else if (type == CONST.NEW_NETWORK)
+        {
+            network.clear ();
+        }
     })
 
     sig.windowResized.add (function ()

@@ -21,7 +21,11 @@ function main ()
 
     $.notify.defaults ({ globalPosition: 'bottom right' });
 
-    sig.wsOpened.add        (function () { notifySuccess ("Connection to server opened");           });
+    sig.wsOpened.add (function ()
+    {
+        notifySuccess ("Connection to server opened, creating network...");
+        sig.wsSend.dispatch (new Int32Array ([CONST.RECREATE_NETWORK]));
+    });
     sig.wsClosed.add        (function () { notifySuccess ("Connection to server closed");           });
     sig.wsErrorOccurred.add (function () { notifyError   ("Error occurred with server connection"); });
 

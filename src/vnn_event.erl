@@ -10,7 +10,8 @@
           delete_handler/2,
           notify_position/2,
           notify_connection/2,
-          notify_spike/1]).
+          notify_spike/1,
+          notify_new_network/0]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -86,3 +87,13 @@ notify_connection (FromId, ToId) ->
 
 notify_spike (Id) ->
     gen_event:notify (?MODULE, {notify_spike, Id}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Notify new network
+%% @end
+%%--------------------------------------------------------------------
+-spec notify_new_network () -> ok.
+
+notify_new_network () ->
+    gen_event:notify (?MODULE, notify_new_network).

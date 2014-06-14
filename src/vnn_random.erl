@@ -71,8 +71,6 @@ uniform (_Min, _Max) ->
     erlang:nif_error (nif_not_loaded).
 
 %%--------------------------------------------------------------------
-%% Tests
-%%--------------------------------------------------------------------
 -ifdef (TEST).
 -include_lib ("eunit/include/eunit.hrl").
 
