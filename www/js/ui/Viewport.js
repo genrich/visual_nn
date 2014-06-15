@@ -6,7 +6,10 @@ function initViewport (sig, params)
     var gl = canvas.getContext ('webgl');
 
     gl.clearColor (params.clear_color[0], params.clear_color[1], params.clear_color[2], 1.0);
+
     gl.enable (gl.DEPTH_TEST);
+    gl.enable (gl.BLEND);
+    gl.blendFunc (gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     var mvMatrix = mat4.create (), pMatrix = mat4.create ();
 

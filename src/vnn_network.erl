@@ -6,7 +6,6 @@
 -module (vnn_network).
 
 -export ([start_link/0,
-          recreate_network/0,
           sim_start/0,
           sim_stop/0,
           set_spike_speed/1,
@@ -35,17 +34,6 @@
 
 start_link () ->
     gen_server:start_link ({local, ?MODULE}, ?MODULE, [], []).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Recreate neural network
-%% @end
-%%--------------------------------------------------------------------
--spec recreate_network () -> ok.
-
-recreate_network () ->
-    vnn_sup:start_network (),
-    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -80,7 +68,7 @@ set_spike_speed (Speed) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server with new Stimuli and Neurons
+%% Initializes the neural network with new Stimuli and Neurons
 %% @end
 %%--------------------------------------------------------------------
 -spec init ([]) -> {ok, #state{}}.
@@ -92,14 +80,32 @@ init ([]) ->
     vnn_event:notify_new_network (),
 
     vnn_utils:reset_id (),
-    Stimuli = vnn_stimulus:create (),
-    Layer0 = create_layer (0, 50),
-    Layer4 = create_layer (3, 50),
-    [connect (Stimulus, Node4) || Stimulus <- Stimuli, Node4 <- Layer4, vnn_random:uniform () < 0.001],
-    [connect (Node4, Node0)    || Node4    <- Layer4,  Node0 <- Layer0, vnn_random:uniform () < 0.01],
 
-    Nodes = Stimuli ++ Layer0 ++ Layer4,
-    [Node ! notify_position || Node <- Nodes],
+    Stimuli = vnn_stimulus:create (),
+    Layer1 = create_layer (1, 100),
+    Layer2 = create_layer (2, 100),
+    Layer3 = create_layer (3, 100),
+    Layer4 = create_layer (4, 100),
+    Layer5 = create_layer (5, 100),
+    Layer6 = create_layer (6, 100),
+
+    [connect (Stimulus, Node4) || Stimulus <- Stimuli, Node4 <- Layer4, vnn_random:uniform () < 0.003],
+    [connect (Stimulus, Node6) || Stimulus <- Stimuli, Node6 <- Layer6, vnn_random:uniform () < 0.0005],
+
+    [connect (Node4_1, Node4_2) || Node4_1 <- Layer4, Node4_2 <- Layer4, Node4_1 =/= Node4_2, vnn_random:uniform () < 0.01],
+
+    [connect (Node6, Node4) || Node6 <- Layer6, Node4 <- Layer4, vnn_random:uniform () < 0.01],
+
+    [connect (Node4, Node2) || Node4 <- Layer4, Node2 <- Layer2, vnn_random:uniform () < 0.01],
+    [connect (Node4, Node3) || Node4 <- Layer4, Node3 <- Layer3, vnn_random:uniform () < 0.01],
+
+    [connect (Node2, Node1) || Node2 <- Layer2, Node1 <- Layer1, vnn_random:uniform () < 0.01],
+    [connect (Node2, Node6) || Node2 <- Layer2, Node6 <- Layer6, vnn_random:uniform () < 0.01],
+
+    [connect (Node3, Node5) || Node3 <- Layer3, Node5 <- Layer5, vnn_random:uniform () < 0.01],
+
+    Nodes = Stimuli ++ Layer1 ++ Layer2 ++ Layer3 ++ Layer4 ++ Layer5 ++ Layer6,
+    [Node ! notify_position    || Node <- Nodes],
     [Node ! notify_connections || Node <- Nodes],
 
     {ok, #state{stimuli = Stimuli, nodes = Nodes}}.
@@ -209,11 +215,11 @@ create_layer (LayerId, Count) when Count > 0 ->
     [createNeuron (LayerId) || _ <- lists:seq (1, Count)].
 
 %%--------------------------------------------------------------------
--spec createNeuron (LayerId :: non_neg_integer ()) -> pid ().
+-spec createNeuron (LayerId :: pos_integer ()) -> pid ().
 
 createNeuron (LayerId) ->
     Position = {-140 + vnn_random:uniform (0.0, 280.0),
-                 300 - (LayerId * 100) + vnn_random:normal (0.0, 10.0),
+                 300 - ((LayerId - 1) * 100) + vnn_random:normal (0.0, 10.0),
                 -280 + vnn_random:uniform (0.0, 560.0)},
     spawn (vnn_node, create, [neuron, Position]).
 

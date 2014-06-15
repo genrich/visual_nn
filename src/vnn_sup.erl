@@ -5,7 +5,7 @@
 %%--------------------------------------------------------------------
 -module (vnn_sup).
 
--export ([start_link/0, start_network/0]).
+-export ([start_link/0, start_network/0, stop_network/0]).
 
 -behaviour (supervisor).
 -export ([init/1]).
@@ -29,10 +29,18 @@ start_link () ->
 %%--------------------------------------------------------------------
 
 start_network () ->
-    supervisor:terminate_child (?SERVER, vnn_network),
     Network = {vnn_network, {vnn_network, start_link, []},
                temporary, 2000, worker, [vnn_network]},
     supervisor:start_child (?SERVER, Network).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Stop neural network
+%% @end
+%%--------------------------------------------------------------------
+
+stop_network () ->
+    supervisor:terminate_child (?SERVER, vnn_network).
 
 %%--------------------------------------------------------------------
 %% @doc

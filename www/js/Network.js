@@ -32,6 +32,7 @@ function Network (gl, params)
     nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
     nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
     nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
+    nodeProgram.point_size  = gl.getUniformLocation (nodeProgram, 'point_size');
 
     connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
 
@@ -153,6 +154,7 @@ function Network (gl, params)
 
         gl.uniform1f (nodeProgram.time,        time);
         gl.uniform1f (nodeProgram.attenuation, params.spike_attenuation);
+        gl.uniform1f (nodeProgram.point_size,  params.point_size);
         gl.uniform3fv (nodeProgram.rest_color,  params.rest_color);
         gl.uniform3fv (nodeProgram.spike_color, params.spike_color);
 
@@ -171,7 +173,7 @@ function Network (gl, params)
     {
         useProgram (connectionProgram, pMatrix, mvMatrix);
 
-        gl.uniform3fv (connectionProgram.rest_color, params.rest_color);
+        gl.uniform3fv (connectionProgram.rest_color, params.connection_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
         gl.vertexAttribPointer (connectionProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);

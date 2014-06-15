@@ -3,15 +3,17 @@ function initParametrization (sig)
     var isSimulationRunning = false;
     var params = new function ()
     {
+        this.point_size        = 20;
         this.clear_color       = vec3.fromValues (0.7, 0.7, 0.7);
         this.rest_color        = vec3.fromValues (0.2, 0.2, 0.2);
+        this.connection_color  = vec3.fromValues (0.5, 0.5, 0.5);
         this.spike_color       = vec3.fromValues (0.9, 0.9, 0);
         this.spike_speed       = CONST.SPIKE_SPEED;
         this.spike_attenuation = 3.0;
         // perspective projection
         this.near          = 1;
         this.far           = 10000;
-        this.log_far_const = Math.log (this.far * 0.001  + 1);
+        this.log_far_const = Math.log (this.far * 0.01  + 1);
         // network
         this.networkRecreate = function ()
         {

@@ -7,5 +7,5 @@ varying float depth;
 
 void main (void)
 {
-    gl_FragColor = vec4 (mix (rest_color, clear_color, depth), 1.0);
+    gl_FragColor = vec4 (mix (rest_color, clear_color, depth), 0.3);
 }

@@ -1,6 +1,6 @@
 function initController (canvas, mvMatrix)
 {
-    var eye              = vec3.fromValues (1000, 500, 0),
+    var eye              = vec3.fromValues (1000, 100, 0),
         up               = vec3.fromValues (0, 1, 0),
         center           = vec3.fromValues (0, 0, 0),
         lookOutDirection = vec3.create (),

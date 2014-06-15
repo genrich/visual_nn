@@ -82,14 +82,16 @@ loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} =
 %%--------------------------------------------------------------------
 -spec generate_stimulus_spike (#s{}) -> #s{}.
 
-generate_stimulus_spike (#s{type = stimulus_active, is_simulation = true} = State) ->
-    NextSpikeTime = to_millis (vnn_random:exponential (?SPIKE_RATE)) + ?ABSOLUTE_REFRACTORY,
-    erlang:send_after (NextSpikeTime, self (), spike),
+generate_stimulus_spike (#s{type = stimulus_active} = State) ->
+    erlang:send_after (to_millis (vnn_random:exponential (?SPIKE_RATE)) + ?ABSOLUTE_REFRACTORY,
+                       self (),
+                       spike),
     State;
 
-generate_stimulus_spike (#s{type = stimulus, is_simulation = true} = State) ->
-    NextSpikeTime = to_millis (vnn_random:exponential (?NOISE_RATE)) + ?ABSOLUTE_REFRACTORY,
-    erlang:send_after (NextSpikeTime, self (), spike),
+generate_stimulus_spike (#s{type = stimulus} = State) ->
+    erlang:send_after (to_millis (vnn_random:exponential (?NOISE_RATE)) + ?ABSOLUTE_REFRACTORY,
+                       self (),
+                       spike),
     State.
 
 %%--------------------------------------------------------------------

@@ -24,8 +24,8 @@
       ReqArg        :: #arg{},
       InitialState  :: term ().
 
-init([_Arg, Params]) ->
-    lager:debug ("ws init ~p: ~p~n", [self(), Params]),
+init([_Arg, _Params]) ->
+    lager:debug ("yaws_ws init"),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -37,7 +37,7 @@ init([_Arg, Params]) ->
       WSState :: #ws_state{}.
 
 handle_open (WsState, State) ->
-    lager:debug ("ws handle open WsState=~p", [WsState]),
+    lager:debug ("yaws_ws open"),
     vnn_event_ws_notifier:set_ws (WsState),
     {ok, State}.
 
@@ -53,7 +53,8 @@ handle_open (WsState, State) ->
       Reason            :: binary ().
 
 handle_message ({binary, <<?RECREATE_NETWORK:32/little>>}) ->
-    vnn_network:recreate_network (),
+    vnn_sup:stop_network  (),
+    vnn_sup:start_network (),
     noreply;
 
 handle_message ({binary, <<?START_SIMULATION:32/little>>}) ->
@@ -73,7 +74,7 @@ handle_message ({Type, Data}) ->
     noreply;
 
 handle_message ({close, _, _}) ->
-    lager:debug ("ws close"),
+    lager:debug ("yaws_ws close"),
     vnn_network:sim_stop (),
     vnn_event_ws_notifier:set_ws (undefined),
     noreply.
@@ -89,4 +90,6 @@ handle_message ({close, _, _}) ->
     Error             :: term ().
 
 terminate (_Reason, _State) ->
+    lager:debug ("yaws_ws terminate"),
+    vnn_sup:stop_network (),
     ok = vnn_event_ws_notifier:set_ws (undefined).
