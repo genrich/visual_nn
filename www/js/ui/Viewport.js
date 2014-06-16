@@ -3,7 +3,7 @@ function initViewport (sig, params)
     var viewport = $('#viewport')[0];
     var canvas   = $('#canvas')  [0];
 
-    var gl = canvas.getContext ('webgl');
+    var gl = canvas.getContext ('webgl', { alpha: false });
 
     gl.clearColor (params.clear_color[0], params.clear_color[1], params.clear_color[2], 1.0);
 
