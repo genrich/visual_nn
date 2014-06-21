@@ -1,21 +1,21 @@
-%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------------------------------------
 %% @doc
 %% Stimulus
 %% @end
-%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------------------------------------
 -module (vnn_stimulus).
 
 -export ([create/0]).
 
 -include_lib ("lager/include/lager.hrl").
 
-%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------------------------------------
 %% @doc
 %% Create stimulus array
 %% @end
-%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------------------------------------
 -spec create () -> [pid ()].
-
+%%--------------------------------------------------------------------------------------------------
 create () ->
     Stimulus = "                                        "
                "                                        "
@@ -41,19 +41,20 @@ create () ->
     Lines  = 20,
     create (Stimulus, Stride, Lines, fun vnn_network:createStimulus/5).
 
-%%--------------------------------------------------------------------
--spec create (String, Stride, Lines, Fun) -> [pid ()] when
-              String :: nonempty_string (),
-              Stride :: pos_integer (),
-              Lines :: pos_integer (),
-              Fun :: fun ((pos_integer (),
-                           pos_integer (),
-                           non_neg_integer (),
-                           non_neg_integer (),
-                           vnn_network:node_type (),
-                           boolean ())
-                          -> pid ()).
 
+%%--------------------------------------------------------------------------------------------------
+-spec create (String, Stride, Lines, Fun) -> [pid ()] when
+      String :: nonempty_string (),
+      Stride :: pos_integer (),
+      Lines  :: pos_integer (),
+      Fun    :: fun ((pos_integer (),
+                      pos_integer (),
+                      non_neg_integer (),
+                      non_neg_integer (),
+                      vnn_network:node_type (),
+                      boolean ())
+                     -> pid ()).
+%%--------------------------------------------------------------------------------------------------
 create (String, Stride, Lines, Fun) ->
     {Pids, _} = 
         lists:mapfoldl (fun ($X, {I0, Strd, Strd}) -> I = I0+1, J = 0, {Fun (Stride, Lines, I, J, stimulus_active),  {I, J+1, Strd}};

@@ -14,4 +14,9 @@ var CONST =
 
     // Params
     SPIKE_SPEED: 100,
+
+    STIMULUS_HELLO_WORLD: 0,
+
+    NETWORK_0: 0,
+    NETWORK_1: 1,
 }

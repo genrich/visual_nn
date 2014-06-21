@@ -12,3 +12,8 @@
 
 %% Params
 -define (SPIKE_SPEED, 100).
+
+-define (STIMULUS_HELLO_WORLD, 0).
+
+-define (NETWORK_0, 0).
+-define (NETWORK_1, 1).

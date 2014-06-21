@@ -1,11 +1,11 @@
-function initViewport (sig, params)
+function initViewport (vnn)
 {
     var viewport = $('#viewport')[0];
     var canvas   = $('#canvas')  [0];
 
     var gl = canvas.getContext ('webgl', { alpha: false });
 
-    gl.clearColor (params.clear_color[0], params.clear_color[1], params.clear_color[2], 1.0);
+    gl.clearColor (vnn.params.clear_color[0], vnn.params.clear_color[1], vnn.params.clear_color[2], 1.0);
 
     gl.enable (gl.DEPTH_TEST);
     gl.enable (gl.BLEND);
@@ -15,7 +15,7 @@ function initViewport (sig, params)
 
     initController (canvas, mvMatrix);
 
-    var network = new Network (gl, params);
+    var network = new Network (gl, vnn.params);
 
     requestAnimationFrame (draw);
 
@@ -38,7 +38,7 @@ function initViewport (sig, params)
         catch (e) { return true; }
     };
 
-    sig.wsMsgReceived.add (function (buffer)
+    vnn.messageReceived.add (function (buffer)
     {
         var type = new Uint32Array (buffer, 0, 1)[0];
 
@@ -64,12 +64,12 @@ function initViewport (sig, params)
         }
     })
 
-    sig.windowResized.add (function ()
+    vnn.windowResized.add (function ()
     {
         canvas.width  = viewport.clientWidth;
         canvas.height = viewport.clientHeight;
 
-        mat4.perspective (pMatrix, Math.PI / 4, canvas.width / canvas.height, params.near, params.far);
+        mat4.perspective (pMatrix, Math.PI / 4, canvas.width / canvas.height, vnn.params.near, vnn.params.far);
         gl.viewport (0, 0, canvas.width, canvas.height);
     });
 
