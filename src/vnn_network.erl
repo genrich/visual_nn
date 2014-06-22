@@ -10,14 +10,14 @@
           sim_start/0,
           sim_stop/0,
           set_spike_speed/1,
-          createStimulus/5]).
+          create_stimulus/5]).
 
 -export_type([position/0, node_type/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--type position ()  :: {number (), number (), number ()}.
+-type position ()  :: {X :: number (), Y :: number (), Z :: number ()}.
 -type node_type () :: stimulus_active | stimulus | neuron.
 
 -include_lib ("lager/include/lager.hrl").
@@ -35,7 +35,7 @@
 -spec start_link (non_neg_integer ()) -> {ok, pid ()}.
 %%--------------------------------------------------------------------------------------------------
 start_link (NetworkId) ->
-    gen_server:start_link ({local, ?MODULE}, ?MODULE, [NetworkId], []).
+    gen_server:start_link ({local, ?MODULE}, ?MODULE, NetworkId, []).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -88,9 +88,9 @@ set_spike_speed (Speed) ->
 %% Initializes the neural network with new Stimuli and Neurons
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec init ([non_neg_integer ()]) -> {ok, #state{}}.
+-spec init (non_neg_integer ()) -> {ok, #state{}}.
 %%--------------------------------------------------------------------------------------------------
-init ([?NETWORK_0]) ->
+init (?NETWORK_0) ->
     lager:debug ("network init 0"),
     process_flag (trap_exit, true),
 
@@ -121,13 +121,16 @@ init ([?NETWORK_0]) ->
 
     [vnn_node:connect (Node3, Node5) || Node3 <- Layer3, Node5 <- Layer5, vnn_random:uniform () < 0.01],
 
-    Nodes = Stimuli ++ Layer1 ++ Layer2 ++ Layer3 ++ Layer4 ++ Layer5 ++ Layer6,
-    [Node ! notify_position    || Node <- Nodes],
-    [Node ! notify_connections || Node <- Nodes],
+    Layers = Layer1 ++ Layer2 ++ Layer3 ++ Layer4 ++ Layer5 ++ Layer6,
+    neighbours (Layers),
+
+    Nodes = Stimuli ++ Layers,
+    [vnn_node:notify_position    (Node) || Node <- Nodes],
+    [vnn_node:notify_connections (Node) || Node <- Nodes],
 
     {ok, #state{stimuli = Stimuli, nodes = Nodes}};
 
-init ([?NETWORK_1]) ->
+init (?NETWORK_1) ->
     lager:debug ("network init 1"),
     process_flag (trap_exit, true),
 
@@ -139,6 +142,8 @@ init ([?NETWORK_1]) ->
     Layer1 = create_layer (1, 100),
 
     [vnn_node:connect (Stimulus, Node1) || Stimulus <- Stimuli, Node1 <- Layer1, vnn_random:uniform () < 0.005],
+
+    neighbours (Layer1),
 
     Nodes = Stimuli ++ Layer1,
     [Node ! notify_position    || Node <- Nodes],
@@ -242,13 +247,13 @@ code_change (_OldVsn, State, _Extra) ->
 -spec create_layer (LayerId :: non_neg_integer (), Count :: pos_integer ()) -> [pid ()].
 %%--------------------------------------------------------------------------------------------------
 create_layer (LayerId, Count) when Count > 0 ->
-    [createNeuron (LayerId) || _ <- lists:seq (1, Count)].
+    [create_neuron (LayerId) || _ <- lists:seq (1, Count)].
 
 
 %%--------------------------------------------------------------------------------------------------
--spec createNeuron (LayerId :: pos_integer ()) -> pid ().
+-spec create_neuron (LayerId :: pos_integer ()) -> pid ().
 %%--------------------------------------------------------------------------------------------------
-createNeuron (LayerId) ->
+create_neuron (LayerId) ->
     Position = {-140 + vnn_random:uniform (0.0, 280.0),
                  300 - ((LayerId - 1) * 100) + vnn_random:normal (0.0, 10.0),
                 -280 + vnn_random:uniform (0.0, 560.0)},
@@ -256,19 +261,30 @@ createNeuron (LayerId) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec createStimulus (Stride, Lines, Row, Col, NodeType) -> pid () when
+-spec create_stimulus (Stride, Lines, Row, Col, NodeType) -> pid () when
       Stride   :: non_neg_integer (),
       Lines    :: non_neg_integer (),
       Row      :: non_neg_integer (),
       Col      :: non_neg_integer (),
       NodeType :: boolean ().
 %%--------------------------------------------------------------------------------------------------
-createStimulus (Stride, TotalLines, Row, Col, NodeType) ->
+create_stimulus (Stride, TotalLines, Row, Col, NodeType) ->
     Step = 14,
     Position = {Row * Step - TotalLines * Step / 2 + Step / 2,
                 -300.0,
                 (Stride - 1 - Col) * Step - Stride * Step / 2 + Step / 2},
     spawn (vnn_node, create, [NodeType, Position]).
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec neighbours ([pid ()]) -> ok.
+%%--------------------------------------------------------------------------------------------------
+neighbours ([]) ->
+    ok;
+
+neighbours ([Node | Nodes]) ->
+    [vnn_node:consider_neighbours (Node, OtherNode) || OtherNode <- Nodes],
+    neighbours (Nodes).
 
 
 %%--------------------------------------------------------------------------------------------------

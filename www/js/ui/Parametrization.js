@@ -52,7 +52,7 @@ function initParametrization (vnn)
     var gui = new dat.GUI ();
     gui.add (vnn.params, 'networkId', { SixLayers: CONST.NETWORK_0, OneLayer: CONST.NETWORK_1 }).name ('network type');
     gui.add (vnn.params, 'networkRecreate').name ('recreate network');
-    gui.add (vnn.params, 'stimulusId', { HelloWorld: CONST.STIMULUS_HELLO_WORLD });
+    gui.add (vnn.params, 'stimulusId', { HelloWorld: CONST.STIMULUS_HELLO_WORLD }).name ('stimulus');
 
     var simulationControl = gui.add (vnn.params, 'simulationToggle').name ('start simulation');
 

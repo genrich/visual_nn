@@ -39,7 +39,7 @@ create () ->
                "                                        ",
     Stride = 40,
     Lines  = 20,
-    create (Stimulus, Stride, Lines, fun vnn_network:createStimulus/5).
+    create (Stimulus, Stride, Lines, fun vnn_network:create_stimulus/5).
 
 
 %%--------------------------------------------------------------------------------------------------

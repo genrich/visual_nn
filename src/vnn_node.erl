@@ -5,14 +5,25 @@
 %%--------------------------------------------------------------------------------------------------
 -module (vnn_node).
 
--export ([create/2, connect/2, loop/1]).
+-export ([create/2,
+          connect/2,
+          notify_position/1,
+          notify_connections/1,
+          consider_neighbours/2,
+          loop/1]).
 
--record (s, {id                     :: non_neg_integer (),
-             type                   :: vnn_network:node_type (),
-             position               :: vnn_network:position (),
-             is_simulation          :: boolean (),
-             inbound  = sets:new () :: sets:set (),
-             outbound = sets:new () :: sets:set ()}).
+-include ("vnn_const.hrl").
+
+-type neighbours_list () :: [{Length :: float (), Node :: pid ()}].
+
+-record (s, {id                       :: non_neg_integer (),
+             type                     :: vnn_network:node_type (),
+             position                 :: vnn_network:position (),
+             is_simulation            :: boolean (),
+             inbound    = sets:new () :: sets:set (),
+             outbound   = sets:new () :: sets:set (),
+             neighbours = []          :: neighbours_list ()}).
+
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
@@ -33,7 +44,43 @@ create (Type, Position) ->
 -spec connect (FromPid :: pid (), ToPid :: pid ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
 connect (FromPid, ToPid) ->
-    FromPid ! {request_connection_to, ToPid},
+    FromPid ! {connect_b, ToPid},
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Make node notify event handler about its position
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_position (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_position (Node) ->
+    Node ! notify_position,
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Make node notify event handler about its outbound connections
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_connections (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_connections (Node) ->
+    Node ! notify_connections,
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Consider nodes to be neighbours
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec consider_neighbours (pid (), pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+consider_neighbours (PidA, PidB) ->
+    PidA ! {neighbour_b, PidB},
     ok.
 
 
@@ -45,11 +92,19 @@ connect (FromPid, ToPid) ->
 %%--------------------------------------------------------------------------------------------------
 -spec loop (#s{}) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
-loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} = State) ->
+loop (#s{id         = Id,
+         position   = Position,
+         inbound    = Inbound,
+         outbound   = Outbound,
+         neighbours = Neighbours}
+      = State) ->
     NewState =
     receive
         spike ->
             spike (State);
+
+        neighbour_spike ->
+            State;
 
         sim_start ->
             generate_stimulus_spike (State#s{is_simulation = true});
@@ -62,26 +117,37 @@ loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} =
             State;
 
         notify_connections ->
-            [To ! {notify_connection, Id} || To <- sets:to_list (Outbound)],
+            [NodeB ! {notify_connection, Id} || NodeB <- sets:to_list (Outbound)],
             State;
 
-        {notify_connection, FromId} ->
-            ok = vnn_event:notify_connection (FromId, Id),
+        {notify_connection, NodeA} ->
+            ok = vnn_event:notify_connection (NodeA, Id),
             State;
 
-        {request_connection_to, To} ->
-            To ! {connect_from, self (), Position},
+        {connect_b, NodeB} ->
+            NodeB ! {connect_a, self (), Position},
             State;
 
-        {connect_from, From, FromPosition} ->
-            Length = length (FromPosition, Position),
-            put (From, Length),
-            From ! {connect_to, self (), Length},
-            State#s{inbound = sets:add_element (From, Inbound)};
+        {connect_a, NodeA, PositionA} ->
+            Length = length (PositionA, Position),
+            NodeA ! {connect_b, self (), Length},
+            State#s{inbound = sets:add_element (NodeA, Inbound)};
 
-        {connect_to, To, Length} ->
-            put (To, Length),
-            State#s{outbound = sets:add_element (To, Outbound)};
+        {connect_b, NodeB, Length} ->
+            put (NodeB, Length),
+            State#s{outbound = sets:add_element (NodeB, Outbound)};
+
+        {neighbour_b, NodeB} ->
+            NodeB ! {neighbour_a, self (), Position},
+            State;
+
+        {neighbour_a, NodeA, NodeAPosition} ->
+            Length = length (NodeAPosition, Position),
+            NodeA ! {neighbour_b, self (), Length},
+            State#s{neighbours = consider_neighbour (Length, NodeA, Neighbours, length (Neighbours))};
+
+        {neighbour_b, NodeB, Length} ->
+            State#s{neighbours = consider_neighbour (Length, NodeB, Neighbours, length (Neighbours))};
 
         {state, ReplyTo} ->
             ReplyTo ! State,
@@ -91,11 +157,6 @@ loop (#s{id = Id, position = Position, inbound = Inbound, outbound = Outbound} =
             throw ({unknown_message, Msg})
     end,
     vnn_node:loop (NewState).
-
--define (ABSOLUTE_REFRACTORY, 1).
--define (NOISE_RATE,          0.01).
--define (SPIKE_RATE,          1.0).
-
 
 %%--------------------------------------------------------------------------------------------------
 -spec generate_stimulus_spike (#s{}) -> #s{}.
@@ -138,17 +199,32 @@ spike (#s{} = State) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec propagate_spikes (Id :: non_neg_integer (), Outbound :: sets:set ()) -> ok.
+-spec propagate_spikes (NodeAId :: non_neg_integer (), Outbound :: sets:set ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-propagate_spikes (Id, Outbound) ->
-    ok = vnn_event:notify_spike (Id),
-    F = fun (Pid) ->
-                Length = get (Pid),
-                NextSpikeTime = to_millis (Length / vnn_params:spike_speed ()) + ?ABSOLUTE_REFRACTORY,
-                erlang:send_after (NextSpikeTime, Pid, spike)
+propagate_spikes (NodeAId, Outbound) ->
+    ok = vnn_event:notify_spike (NodeAId),
+    F = fun (NodeB) ->
+                Length = get (NodeB),
+                SpikeTravelDuration = to_millis (Length / vnn_params:spike_speed ()),
+                erlang:send_after (SpikeTravelDuration, NodeB, spike)
         end,
-    [F (To) || To <- sets:to_list (Outbound)],
+    [F (NodeB) || NodeB <- sets:to_list (Outbound)],
     ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec consider_neighbour (float (), pid (), neighbours_list (), non_neg_integer ()) -> neighbours_list ().
+%%--------------------------------------------------------------------------------------------------
+consider_neighbour (Length, Node, Neighbours, ?MAX_NEIGHBOURS) ->
+    [{LargestLength, _} | Tail] = lists:sort (fun ({LengthA, _}, {LengthB, _}) -> LengthA > LengthB end,
+                                              Neighbours),
+    case Length < LargestLength of
+        true  -> [{Length, Node} | Tail];
+        false -> Neighbours
+    end;
+
+consider_neighbour (Length, Node, Neighbours, _) ->
+    [{Length, Node} | Neighbours].
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -202,6 +278,16 @@ node_test_ () ->
 
       {"neighbours", ?_test
        (begin
-            ?assert (true)
+            [Node | Nodes] = [spawn (vnn_node, create, [neuron, {NodeId - 1, 0, 0}]) || NodeId <- lists:seq (1, ?MAX_NEIGHBOURS + 1)],
+            [consider_neighbours (Node, OtherNode) || OtherNode <- Nodes],
+            timer:sleep (300),
+
+            Node ! {state, self ()},
+            receive State -> State end,
+
+            ?assert (length (State#s.neighbours) == ?MAX_NEIGHBOURS),
+            {Neighbours, NotNeighbour} = lists:split (?MAX_NEIGHBOURS, Nodes),
+            ?assertNot (lists:keyfind (NotNeighbour, 2, State#s.neighbours)),
+            [?assert (is_tuple (lists:keyfind (Neighbour, 2, State#s.neighbours))) || Neighbour <- Neighbours]
         end)}]}.
 -endif.
