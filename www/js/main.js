@@ -22,6 +22,8 @@ function main ()
         this.connectionClosed = new signals.Signal ();
         this.connectionError  = new signals.Signal ();
         this.messageReceived  = new signals.Signal ();
+        this.pickerMoved      = new signals.Signal ();
+        this.pickerClicked    = new signals.Signal ();
 
         this.connect = function ()
         {
@@ -54,6 +56,11 @@ function main ()
         {
             notifyInfo ('Stopping simulation...');
             send (new Uint32Array ([CONST.STOP_SIMULATION]));
+        }
+
+        this.selectNode = function (id)
+        {
+            send (new Uint32Array ([CONST.SELECT_NODE, id]));
         }
 
         this.setSpikeSpeed = function (speed)

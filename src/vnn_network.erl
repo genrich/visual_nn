@@ -9,6 +9,7 @@
           stop/0,
           sim_start/0,
           sim_stop/0,
+          select_node/1,
           set_spike_speed/1,
           create_stimulus/5]).
 
@@ -69,6 +70,17 @@ sim_start () ->
 %%--------------------------------------------------------------------------------------------------
 sim_stop () ->
     gen_server:cast (?MODULE, sim_stop).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Select node
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec select_node (non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+select_node (Id) ->
+    gen_server:cast (?MODULE, {select_node, Id}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -177,7 +189,7 @@ handle_call (_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec handle_cast(Msg, State ) -> {noreply, #state{}, timeout ()} | {noreply, #state{}} when
-      Msg   :: sim_start | sim_stop | {set_spike_speed, _} | stop,
+      Msg   :: sim_start | sim_stop | {select_node, _} | {set_spike_speed, _} | stop,
       State :: #state{}.
 %%--------------------------------------------------------------------------------------------------
 handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
@@ -189,6 +201,10 @@ handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
 handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
     lager:debug ("sim_stop"),
     [Stimulus ! sim_stop || Stimulus <- Stimuli],
+    {noreply, State};
+
+handle_cast ({select_node, Id}, #state{} = State) ->
+    lager:debug ("select node: ~p", [Id]),
     {noreply, State};
 
 handle_cast ({set_spike_speed, Speed}, #state{} = State) ->

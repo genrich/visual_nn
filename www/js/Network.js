@@ -1,10 +1,31 @@
-function Network (gl, params)
+function Network (gl, vnn)
 {
     const FLOAT_SIZE = 4, INT_SIZE = 2,
-          SPIKE_ITEM_SIZE = 8, // x1, y1, z1, x2, y2, z3, duration, end_time
-          VEC3_SIZE = 3, // x, y, z
-          NODE_SIZE = 4, // x, y, z, end_time
-          NODE_BYTES = NODE_SIZE * FLOAT_SIZE,
+          // x, y, z
+          POS_SIZE = 3,
+          // x1, y1, z1, x2, y2, z3, duration, end_time
+          SPIKE_ITEM_SIZE            = 8,
+          SPIKE_POS1_OFFSET          = 0,
+          SPIKE_POS2_OFFSET          = 3,
+          SPIKE_DURATION_OFFSET      = 6,
+          SPIKE_END_TIME_OFFSET      = 7,
+          SPIKE_BYTES                = SPIKE_ITEM_SIZE       * FLOAT_SIZE,
+          SPIKE_POS1_BYTE_OFFSET     = SPIKE_POS1_OFFSET     * FLOAT_SIZE,
+          SPIKE_POS2_BYTE_OFFSET     = SPIKE_POS2_OFFSET     * FLOAT_SIZE,
+          SPIKE_DURATION_BYTE_OFFSET = SPIKE_DURATION_OFFSET * FLOAT_SIZE,
+          SPIKE_END_TIME_BYTE_OFFSET = SPIKE_END_TIME_OFFSET * FLOAT_SIZE,
+          // x, y, z, id, end_time, attributes
+          NODE_SIZE                 = 6,
+          NODE_POS_OFFSET           = 0,
+          NODE_ID_OFFSET            = 3,
+          NODE_END_TIME_OFFSET      = 4,
+          NODE_ATTR_OFFSET          = 5,
+          NODE_BYTES                = NODE_SIZE            * FLOAT_SIZE,
+          NODE_POS_BYTE_OFFSET      = NODE_POS_OFFSET      * FLOAT_SIZE,
+          NODE_ID_BYTE_OFFSET       = NODE_ID_OFFSET       * FLOAT_SIZE,
+          NODE_END_TIME_BYTE_OFFSET = NODE_END_TIME_OFFSET * FLOAT_SIZE,
+          NODE_ATTR_BYTE_OFFSET     = NODE_ATTR_OFFSET     * FLOAT_SIZE,
+          //
           NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0;
 
     // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
@@ -20,6 +41,7 @@ function Network (gl, params)
 
 
     var nodeProgram       = initProgram (gl, 'node'),
+        nodePickerProgram = initProgram (gl, 'nodePicker'),
         connectionProgram = initProgram (gl, 'connection'),
         spikeProgram      = initProgram (gl, 'spike');
 
@@ -27,12 +49,17 @@ function Network (gl, params)
         lineIndexBuffer = gl.createBuffer (),
         spikeBuffer     = gl.createBuffer ();
 
-    nodeProgram.end_time = gl.getAttribLocation (nodeProgram, 'end_time');
+    nodeProgram.end_time   = gl.getAttribLocation (nodeProgram, 'end_time');
+    nodeProgram.attributes = gl.getAttribLocation (nodeProgram, 'attributes');
     nodeProgram.time        = gl.getUniformLocation (nodeProgram, 'time');
     nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
     nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
     nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
+    nodeProgram.hover_color = gl.getUniformLocation (nodeProgram, 'hover_color');
     nodeProgram.point_size  = gl.getUniformLocation (nodeProgram, 'point_size');
+
+    nodePickerProgram.id = gl.getAttribLocation (nodePickerProgram, 'id');
+    nodePickerProgram.point_size = gl.getUniformLocation (nodePickerProgram, 'point_size');
 
     connectionProgram.rest_color = gl.getUniformLocation (connectionProgram, 'rest_color');
 
@@ -80,14 +107,42 @@ function Network (gl, params)
             isNodesBufferFresh = false;
         }
 
-        nodesArray[i_start]     = x;
-        nodesArray[i_start + 1] = y;
-        nodesArray[i_start + 2] = z;
-        nodesArray[i_start + 3] = 0;
+        nodesArray[i_start + NODE_POS_OFFSET]      = x;
+        nodesArray[i_start + NODE_POS_OFFSET + 1]  = y;
+        nodesArray[i_start + NODE_POS_OFFSET + 2]  = z;
+        nodesArray[i_start + NODE_ID_OFFSET]       = i;
+        nodesArray[i_start + NODE_END_TIME_OFFSET] = 0;
+        nodesArray[i_start + NODE_ATTR_OFFSET]     = 0;
 
         nodesToUpdate.push (i);
 
         if (adjacencyList[i] === undefined) adjacencyList[i] = [];
+    }
+
+    var lastHoverId;
+    this.hover = function (id)
+    {
+        if (id < CONST.MAX_ID)
+        {
+            if (lastHoverId == undefined || id != lastHoverId)
+            {
+                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = 1;
+                nodesToUpdate.push (id);
+            }
+            if (lastHoverId != id)
+            {
+                nodesArray[lastHoverId * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
+                nodesToUpdate.push (lastHoverId);
+                lastHoverId = undefined;
+            }
+            lastHoverId = id;
+        }
+        else if (lastHoverId)
+        {
+            nodesArray[lastHoverId * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
+            nodesToUpdate.push (lastHoverId);
+            lastHoverId = undefined;
+        }
     }
 
     function prefill (id1, id2)
@@ -130,8 +185,8 @@ function Network (gl, params)
 
         if (v_idx < numNodes)
         {
-            var i = v_idx * NODE_SIZE + 3;
-            nodesArray[i] = time + params.spike_attenuation;
+            var i = v_idx * NODE_SIZE + NODE_END_TIME_OFFSET;
+            nodesArray[i] = time + vnn.params.spike_attenuation;
 
             nodeSpikes.push (v_idx);
         }
@@ -140,7 +195,7 @@ function Network (gl, params)
         {
             var u_idx = adjacencyList[v_idx][i];
             var v = this.get (v_idx), u = this.get (u_idx);
-            var duration = vec3.distance (v, u) / params.spike_speed,
+            var duration = vec3.distance (v, u) / vnn.params.spike_speed,
                 end_time = time + duration;
 
             radiatingSpikes.push (v[0], v[1], v[2], u[0], u[1], u[2], duration, end_time);
@@ -151,20 +206,23 @@ function Network (gl, params)
     {
         useProgram (nodeProgram, pMatrix, mvMatrix);
         gl.enableVertexAttribArray (nodeProgram.end_time);
+        gl.enableVertexAttribArray (nodeProgram.attributes);
 
         gl.uniform1f (nodeProgram.time,        time);
-        gl.uniform1f (nodeProgram.attenuation, params.spike_attenuation);
-        gl.uniform1f (nodeProgram.point_size,  params.point_size);
-        gl.uniform3fv (nodeProgram.rest_color,  params.rest_color);
-        gl.uniform3fv (nodeProgram.spike_color, params.spike_color);
+        gl.uniform1f (nodeProgram.attenuation, vnn.params.spike_attenuation);
+        gl.uniform1f (nodeProgram.point_size,  vnn.params.point_size);
+        gl.uniform3fv (nodeProgram.rest_color,  vnn.params.rest_color);
+        gl.uniform3fv (nodeProgram.spike_color, vnn.params.spike_color);
+        gl.uniform3fv (nodeProgram.hover_color, vnn.params.hover_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
 
         updateNodes ();
         updateSpikesEndTime ();
 
-        gl.vertexAttribPointer (nodeProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
-        gl.vertexAttribPointer (nodeProgram.end_time,         1, gl.FLOAT, false, NODE_BYTES, 12);
+        gl.vertexAttribPointer (nodeProgram.position,   POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodeProgram.end_time,          1, gl.FLOAT, false, NODE_BYTES, NODE_END_TIME_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodeProgram.attributes,        1, gl.FLOAT, false, NODE_BYTES, NODE_ATTR_BYTE_OFFSET);
 
         gl.drawArrays (gl.POINTS, 0, numNodes);
     }
@@ -173,10 +231,10 @@ function Network (gl, params)
     {
         useProgram (connectionProgram, pMatrix, mvMatrix);
 
-        gl.uniform3fv (connectionProgram.rest_color, params.connection_color);
+        gl.uniform3fv (connectionProgram.rest_color, vnn.params.connection_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
-        gl.vertexAttribPointer (connectionProgram.position, VEC3_SIZE, gl.FLOAT, false, NODE_BYTES, 0);
+        gl.vertexAttribPointer (connectionProgram.position, POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
 
         gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
 
@@ -206,19 +264,34 @@ function Network (gl, params)
         gl.enableVertexAttribArray (spikeProgram.end_time);
 
         gl.uniform1f        (spikeProgram.time, time);
-        gl.uniform3fv       (spikeProgram.spike_color, params.spike_color);
+        gl.uniform3fv       (spikeProgram.spike_color, vnn.params.spike_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
         clearExpiredSpikes (time);
         updateSpikesArray ();
 
-        gl.vertexAttribPointer (spikeProgram.position,     VEC3_SIZE, gl.FLOAT, false, 32, 0);
-        gl.vertexAttribPointer (spikeProgram.end_position, VEC3_SIZE, gl.FLOAT, false, 32, 12);
-        gl.vertexAttribPointer (spikeProgram.duration,             1, gl.FLOAT, false, 32, 24);
-        gl.vertexAttribPointer (spikeProgram.end_time,             1, gl.FLOAT, false, 32, 28);
+        gl.vertexAttribPointer (spikeProgram.position,     POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS1_BYTE_OFFSET);
+        gl.vertexAttribPointer (spikeProgram.end_position, POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS2_BYTE_OFFSET);
+        gl.vertexAttribPointer (spikeProgram.duration,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_DURATION_BYTE_OFFSET);
+        gl.vertexAttribPointer (spikeProgram.end_time,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_END_TIME_BYTE_OFFSET);
 
         gl.drawArrays (gl.POINTS, 0, numSpikes);
+    }
+
+    this.drawPicker = function (pMatrix, mvMatrix)
+    {
+        useProgram (nodePickerProgram, pMatrix, mvMatrix);
+        gl.enableVertexAttribArray (nodePickerProgram.id);
+
+        gl.uniform1f (nodePickerProgram.point_size, vnn.params.point_size);
+
+        gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
+
+        gl.vertexAttribPointer (nodePickerProgram.position, POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodePickerProgram.id,              1, gl.FLOAT, false, NODE_BYTES, NODE_ID_BYTE_OFFSET);
+
+        gl.drawArrays (gl.POINTS, 0, numNodes);
     }
 
     function updateNodes ()
@@ -244,7 +317,7 @@ function Network (gl, params)
     {
         while (nodeSpikes.length)
         {
-            var i = nodeSpikes.pop () * NODE_SIZE + 3;
+            var i = nodeSpikes.pop () * NODE_SIZE + NODE_END_TIME_OFFSET;
             var a = nodesArray.subarray (i, i + 1);
             if (a.length)
                 gl.bufferSubData (gl.ARRAY_BUFFER, i * FLOAT_SIZE, a);
@@ -259,9 +332,9 @@ function Network (gl, params)
 
         gl.uniformMatrix4fv (program.pMatrix,  false, pMatrix);
         gl.uniformMatrix4fv (program.mvMatrix, false, mvMatrix);
-        gl.uniform1f (program.log_far_const, params.log_far_const);
-        gl.uniform1f (program.far,           params.far);
-        gl.uniform3fv (program.clear_color, params.clear_color);
+        gl.uniform1f (program.log_far_const, vnn.params.log_far_const);
+        gl.uniform1f (program.far,           vnn.params.far);
+        gl.uniform3fv (program.clear_color, vnn.params.clear_color);
     }
 
     function clearExpiredSpikes (time)

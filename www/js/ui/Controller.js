@@ -1,5 +1,7 @@
-function initController (canvas, mvMatrix)
+function initController (vnn, canvas, mvMatrix)
 {
+    const FRAMEBUFFER_SIZE = 512;
+
     var eye              = vec3.fromValues (1000, 100, 0),
         up               = vec3.fromValues (0, 1, 0),
         center           = vec3.fromValues (0, 0, 0),
@@ -8,15 +10,29 @@ function initController (canvas, mvMatrix)
 
     var mouseDown = false,
         lastMouseX, lastMouseY,
+        mouseDownX, mouseDownY,
         buttonState;
 
     canvas.oncontextmenu = function (evnt) { evnt.preventDefault (); };
     canvas.onmousedown = handleMouseDown;
     canvas.onwheel     = handleWheel;
+    canvas.onclick     = handleClick;
     document.onmouseup   = handleMouseUp;
     document.onmousemove = handleMouseMove;
 
     mat4.lookAt (mvMatrix, eye, center, up);
+
+    function handleClick (evnt)
+    {
+        var newX = evnt.clientX;
+        var newY = evnt.clientY;
+        if (Math.abs (newX - mouseDownX) < 3 && Math.abs (newY - mouseDownY) < 3)
+        {
+            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_SIZE);
+            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_SIZE);
+            vnn.pickerClicked.dispatch (x, y);
+        }
+    }
 
     function handleMouseDown (evnt)
     {
@@ -25,6 +41,8 @@ function initController (canvas, mvMatrix)
         mouseDown = true;
         lastMouseX = evnt.clientX;
         lastMouseY = evnt.clientY;
+        mouseDownX = evnt.clientX;
+        mouseDownY = evnt.clientY;
         buttonState = evnt.button;
     }
 
@@ -35,11 +53,11 @@ function initController (canvas, mvMatrix)
 
     function handleMouseMove (evnt)
     {
+        var newX = evnt.clientX;
+        var newY = evnt.clientY;
+
         if (mouseDown)
         {
-            var newX = evnt.clientX;
-            var newY = evnt.clientY;
-
             var deltaX = (newX - lastMouseX) * 5;
             var deltaY = (newY - lastMouseY) * 5;
 
@@ -83,6 +101,12 @@ function initController (canvas, mvMatrix)
 
             lastMouseX = newX
             lastMouseY = newY;
+        }
+        else
+        {
+            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_SIZE);
+            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_SIZE);
+            vnn.pickerMoved.dispatch (x, y);
         }
     }
 

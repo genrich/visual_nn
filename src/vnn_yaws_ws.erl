@@ -67,6 +67,10 @@ handle_message ({binary, <<?STOP_SIMULATION:32/little>>}) ->
     vnn_network:sim_stop (),
     noreply;
 
+handle_message ({binary, <<?SELECT_NODE:32/little, Id:32/little>>}) ->
+    vnn_network:select_node (Id),
+    noreply;
+
 handle_message ({binary, <<?SET_SPIKE_SPEED:32/little, Speed:32/little-float>>}) ->
     vnn_network:set_spike_speed (Speed),
     noreply;

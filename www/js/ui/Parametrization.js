@@ -9,6 +9,8 @@ function initParametrization (vnn)
         this.rest_color        = vec3.fromValues (0.2, 0.2, 0.2);
         this.connection_color  = vec3.fromValues (0.5, 0.5, 0.5);
         this.spike_color       = vec3.fromValues (0.9, 0.9, 0);
+        this.hover_color       = vec3.fromValues (0.9, 0.0, 0.0);
+        this.selected_color    = vec3.fromValues (0.7, 0.0, 0.0);
         this.spike_speed       = CONST.SPIKE_SPEED;
         this.spike_attenuation = 3.0;
 
