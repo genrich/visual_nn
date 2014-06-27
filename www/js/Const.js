@@ -9,13 +9,14 @@ var CONST =
 
     // Server messages
     SPIKE: 0,
-    POSITION: 1,
-    CONNECTION: 2,
-    NEW_NETWORK: 3,
+    SELECTED_NEIGHBOUR: 1,
+    SELECTED_INBOUND: 2,
+    SELECTED_OUTBOUND: 3,
+    POSITION: 4,
+    CONNECTION: 5,
+    NEW_NETWORK: 6,
 
     // Params
-    MAX_ID: 16777215,
-
     SPIKE_SPEED: 100,
 
     STIMULUS_HELLO_WORLD: 0,

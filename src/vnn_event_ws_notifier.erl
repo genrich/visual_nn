@@ -92,13 +92,25 @@ handle_call({set_ws, Ws}, _State) ->
 handle_event (_, #state{ws = undefined} = State) ->
     {ok, State};
 
+handle_event ({notify_spike, Id}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?SPIKE:32/little, Id:32/little>>}),
+    {ok, State};
+
+handle_event ({notify_inbound, Id}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?SELECTED_INBOUND:32/little, Id:32/little>>}),
+    {ok, State};
+
+handle_event ({notify_outbound, Id}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?SELECTED_OUTBOUND:32/little, Id:32/little>>}),
+    {ok, State};
+
+handle_event ({notify_neighbour, Id}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?SELECTED_NEIGHBOUR:32/little, Id:32/little>>}),
+    {ok, State};
+
 handle_event ({notify_position, Id, {X, Y, Z}}, #state{ws = Ws} = State) ->
     [ok] = yaws_api:websocket_send (Ws, {binary, <<?POSITION:32/little, Id:32/little,
                                                    X:32/little-float, Y:32/little-float, Z:32/little-float>>}),
-    {ok, State};
-
-handle_event ({notify_spike, Id}, #state{ws = Ws} = State) ->
-    [ok] = yaws_api:websocket_send (Ws, {binary, <<?SPIKE:32/little, Id:32/little>>}),
     {ok, State};
 
 handle_event ({notify_connection, FromId, ToId}, #state{ws = Ws} = State) ->

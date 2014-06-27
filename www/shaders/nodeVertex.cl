@@ -13,7 +13,6 @@ uniform float point_size;
 
 uniform vec3 rest_color;
 uniform vec3 spike_color;
-uniform vec3 hover_color;
 
 varying vec3 color;
 
@@ -21,9 +20,13 @@ varying float depth;
 
 void main (void)
 {
+    vec3 attr_color = vec3 (mod (attributes,                   256.0) / 255.0,
+                            mod (floor (attributes / 256.0),   256.0) / 255.0,
+                            mod (floor (attributes / 65536.0), 256.0) / 255.0);
+
     if (time > end_time)
     {
-        color = int (attributes) == 1 ? hover_color : rest_color;
+        color = attributes == 0.0 ? rest_color : attr_color;
     }
     else
     {
@@ -32,7 +35,7 @@ void main (void)
         float t2 = t * t;
         float spike_strength = t1 * t2;
 
-        color = int (attributes) == 1 ? hover_color : mix (rest_color, spike_color, spike_strength);
+        color = attributes == 0.0 ? mix (rest_color, spike_color, spike_strength) : attr_color;
     }
 
     gl_Position = pMatrix * mvMatrix * vec4 (position, 1.0);

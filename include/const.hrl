@@ -6,14 +6,15 @@
 -define (SET_SPIKE_SPEED,  4).
 
 %% Server messages
--define (SPIKE,       0).
--define (POSITION,    1).
--define (CONNECTION,  2).
--define (NEW_NETWORK, 3).
+-define (SPIKE,              0).
+-define (SELECTED_NEIGHBOUR, 1).
+-define (SELECTED_INBOUND,   2).
+-define (SELECTED_OUTBOUND,  3).
+-define (POSITION,           4).
+-define (CONNECTION,         5).
+-define (NEW_NETWORK,        6).
 
 %% Params
--define (MAX_ID, 16777215).
-
 -define (SPIKE_SPEED, 100).
 
 -define (STIMULUS_HELLO_WORLD, 0).

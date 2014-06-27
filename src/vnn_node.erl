@@ -7,6 +7,7 @@
 
 -export ([create/2,
           connect/2,
+          notify_selected/1,
           notify_position/1,
           notify_connections/1,
           consider_neighbours/2,
@@ -19,6 +20,7 @@
 -record (s, {id                       :: non_neg_integer (),
              type                     :: vnn_network:node_type (),
              position                 :: vnn_network:position (),
+             node_to_length = #{}     :: #{pid () => float ()},
              is_simulation            :: boolean (),
              inbound    = sets:new () :: sets:set (),
              outbound   = sets:new () :: sets:set (),
@@ -33,7 +35,9 @@
 -spec create (Type :: vnn_network:node_type (), Position :: vnn_network:position ()) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
 create (Type, Position) ->
-    vnn_node:loop (#s{id = vnn_utils:id (), type = Type, position = Position}).
+    Id = vnn_utils:id (),
+    vnn_network:register_node (Id, self ()),
+    vnn_node:loop (#s{id = Id, type = Type, position = Position}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -45,6 +49,18 @@ create (Type, Position) ->
 %%--------------------------------------------------------------------------------------------------
 connect (FromPid, ToPid) ->
     FromPid ! {connect_b, ToPid},
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Make node notify event handler about its inbound/outbound/neighbours
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_selected (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_selected (Node) ->
+    Node ! notify_selected,
     ok.
 
 
@@ -92,11 +108,12 @@ consider_neighbours (PidA, PidB) ->
 %%--------------------------------------------------------------------------------------------------
 -spec loop (#s{}) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
-loop (#s{id         = Id,
-         position   = Position,
-         inbound    = Inbound,
-         outbound   = Outbound,
-         neighbours = Neighbours}
+loop (#s{id             = Id,
+         position       = Position,
+         node_to_length = NodeToLength,
+         inbound        = Inbound,
+         outbound       = Outbound,
+         neighbours     = Neighbours}
       = State) ->
     NewState =
     receive
@@ -111,6 +128,24 @@ loop (#s{id         = Id,
 
         sim_stop ->
             State#s{is_simulation = false};
+
+        notify_selected ->
+            [NodeB ! notify_inbound   || NodeB      <- sets:to_list (Inbound)],
+            [NodeB ! notify_outbound  || NodeB      <- sets:to_list (Outbound)],
+            [NodeB ! notify_neighbour || {_, NodeB} <- Neighbours],
+            State;
+
+        notify_inbound ->
+            ok = vnn_event:notify_inbound (Id),
+            State;
+
+        notify_outbound ->
+            ok = vnn_event:notify_outbound (Id),
+            State;
+
+        notify_neighbour ->
+            ok = vnn_event:notify_neighbour (Id),
+            State;
 
         notify_position ->
             ok = vnn_event:notify_position (Id, Position),
@@ -134,8 +169,9 @@ loop (#s{id         = Id,
             State#s{inbound = sets:add_element (NodeA, Inbound)};
 
         {connect_b, NodeB, Length} ->
-            put (NodeB, Length),
-            State#s{outbound = sets:add_element (NodeB, Outbound)};
+            %% put (NodeB, Length),
+            State#s{outbound       = sets:add_element (NodeB, Outbound),
+                    node_to_length = maps:put (NodeB, Length, NodeToLength)};
 
         {neighbour_b, NodeB} ->
             NodeB ! {neighbour_a, self (), Position},
@@ -177,16 +213,30 @@ generate_stimulus_spike (#s{type = stimulus} = State) ->
 %%--------------------------------------------------------------------------------------------------
 -spec spike (#s{}) -> #s{}.
 %%--------------------------------------------------------------------------------------------------
-spike (#s{id = Id, type = stimulus_active, is_simulation = true, outbound = Outbound} = State) ->
-    propagate_spikes (Id, Outbound),
+spike (#s{type           = stimulus_active,
+          is_simulation  = true,
+          id             = Id,
+          node_to_length = NodeToLength,
+          outbound       = Outbound}
+       = State) ->
+    propagate_spikes (Id, Outbound, NodeToLength),
     generate_stimulus_spike (State);
 
-spike (#s{id = Id, type = stimulus, is_simulation = true, outbound = Outbound} = State) ->
-    propagate_spikes (Id, Outbound),
+spike (#s{type           = stimulus,
+          is_simulation  = true,
+          id             = Id,
+          node_to_length = NodeToLength,
+          outbound       = Outbound}
+       = State) ->
+    propagate_spikes (Id, Outbound, NodeToLength),
     generate_stimulus_spike (State);
 
-spike (#s{id = Id, type = neuron, outbound = Outbound} = State) ->
-    case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound);
+spike (#s{type           = neuron,
+          id             = Id,
+          node_to_length = NodeToLength,
+          outbound       = Outbound}
+       = State) ->
+    case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound, NodeToLength);
                                         false -> undefined
     end,
     State;
@@ -199,12 +249,13 @@ spike (#s{} = State) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec propagate_spikes (NodeAId :: non_neg_integer (), Outbound :: sets:set ()) -> ok.
+-spec propagate_spikes (non_neg_integer (), sets:set (), #{pid () => float ()}) -> ok.
 %%--------------------------------------------------------------------------------------------------
-propagate_spikes (NodeAId, Outbound) ->
+propagate_spikes (NodeAId, Outbound, NodeToLength) ->
     ok = vnn_event:notify_spike (NodeAId),
     F = fun (NodeB) ->
-                Length = get (NodeB),
+                %% Length = get (NodeB),
+                Length = maps:get (NodeB, NodeToLength),
                 SpikeTravelDuration = to_millis (Length / vnn_params:spike_speed ()),
                 erlang:send_after (SpikeTravelDuration, NodeB, spike)
         end,

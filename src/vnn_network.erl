@@ -11,6 +11,7 @@
           sim_stop/0,
           select_node/1,
           set_spike_speed/1,
+          register_node/2,
           create_stimulus/5]).
 
 -export_type([position/0, node_type/0]).
@@ -25,8 +26,9 @@
 
 -include ("const.hrl").
 
--record (state, {nodes   :: [pid ()],
-                 stimuli :: [pid ()]}).
+-record (s, {nodes            :: [pid ()],
+             stimuli          :: [pid ()],
+             id_to_node = #{} :: #{non_neg_integer () => pid ()}}).
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
@@ -74,7 +76,7 @@ sim_stop () ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Select node
+%% Process node selection: notify all node neighbours and connections
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec select_node (non_neg_integer ()) -> ok.
@@ -88,10 +90,21 @@ select_node (Id) ->
 %% Set spike speed param
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec set_spike_speed (Speed :: float ()) -> ok.
+-spec set_spike_speed (float ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
 set_spike_speed (Speed) ->
     gen_server:cast (?MODULE, {set_spike_speed, Speed}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Register node id to pid mapping
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec register_node (non_neg_integer (), pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+register_node (Id, Node) ->
+    gen_server:cast (?MODULE, {register_node, Id, Node}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -100,7 +113,7 @@ set_spike_speed (Speed) ->
 %% Initializes the neural network with new Stimuli and Neurons
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec init (non_neg_integer ()) -> {ok, #state{}}.
+-spec init (non_neg_integer ()) -> {ok, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 init (?NETWORK_0) ->
     lager:debug ("network init 0"),
@@ -140,7 +153,7 @@ init (?NETWORK_0) ->
     [vnn_node:notify_position    (Node) || Node <- Nodes],
     [vnn_node:notify_connections (Node) || Node <- Nodes],
 
-    {ok, #state{stimuli = Stimuli, nodes = Nodes}};
+    {ok, #s{stimuli = Stimuli, nodes = Nodes}};
 
 init (?NETWORK_1) ->
     lager:debug ("network init 1"),
@@ -161,7 +174,7 @@ init (?NETWORK_1) ->
     [Node ! notify_position    || Node <- Nodes],
     [Node ! notify_connections || Node <- Nodes],
 
-    {ok, #state{stimuli = Stimuli, nodes = Nodes}}.
+    {ok, #s{stimuli = Stimuli, nodes = Nodes}}.
 
 %%--------------------------------------------------------------------------------------------------
 %% @private
@@ -169,13 +182,13 @@ init (?NETWORK_1) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) ->
-    {reply, Reply :: term(), NewState :: #state{}}                        |
-    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-    {noreply, NewState :: #state{}}                                       |
-    {noreply, NewState :: #state{}, timeout() | hibernate}                |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}}       |
-    {stop, Reason :: term(), NewState :: #state{}}.
+-spec handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #s{}) ->
+    {reply, Reply :: term(), NewState :: #s{}}                        |
+    {reply, Reply :: term(), NewState :: #s{}, timeout() | hibernate} |
+    {noreply, NewState :: #s{}}                                       |
+    {noreply, NewState :: #s{}, timeout() | hibernate}                |
+    {stop, Reason :: term(), Reply :: term(), NewState :: #s{}}       |
+    {stop, Reason :: term(), NewState :: #s{}}.
 %%--------------------------------------------------------------------------------------------------
 handle_call (_Request, _From, State) ->
     Reply = ok,
@@ -188,28 +201,30 @@ handle_call (_Request, _From, State) ->
 %% Handling cast messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_cast(Msg, State ) -> {noreply, #state{}, timeout ()} | {noreply, #state{}} when
-      Msg   :: sim_start | sim_stop | {select_node, _} | {set_spike_speed, _} | stop,
-      State :: #state{}.
+-spec handle_cast (term (), #s{}) -> {noreply, #s{}} | {stop, normal, #s{}}.
 %%--------------------------------------------------------------------------------------------------
-handle_cast (sim_start, #state{stimuli = Stimuli} = State) ->
+handle_cast (sim_start, #s{stimuli = Stimuli} = State) ->
     lager:debug ("sim_start"),
     [Stimulus ! sim_start || Stimulus <- Stimuli],
 
     {noreply, State};
 
-handle_cast (sim_stop, #state{stimuli = Stimuli} = State) ->
+handle_cast (sim_stop, #s{stimuli = Stimuli} = State) ->
     lager:debug ("sim_stop"),
     [Stimulus ! sim_stop || Stimulus <- Stimuli],
     {noreply, State};
 
-handle_cast ({select_node, Id}, #state{} = State) ->
-    lager:debug ("select node: ~p", [Id]),
+handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
+    Node = maps:get (Id, IdToNode),
+    vnn_node:notify_selected (Node),
     {noreply, State};
 
-handle_cast ({set_spike_speed, Speed}, #state{} = State) ->
+handle_cast ({set_spike_speed, Speed}, #s{} = State) ->
     vnn_params:set_spike_speed (Speed),
     {noreply, State};
+
+handle_cast ({register_node, Id, Node}, #s{id_to_node = IdToNode} = State) ->
+    {noreply, State#s{id_to_node = maps:put (Id, Node, IdToNode)}};
 
 handle_cast (stop, State) ->
     {stop, normal, State}.
@@ -221,7 +236,7 @@ handle_cast (stop, State) ->
 %% Handling all non call/cast messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_info (timeout, #state{}) -> {noreply, #state{}}.
+-spec handle_info (timeout, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 handle_info (timeout, State) ->
     {noreply, State}.
@@ -239,7 +254,7 @@ handle_info (timeout, State) ->
 -spec terminate (Reason :: (normal | shutdown | {shutdown, term ()} | term ()),
                  State :: term ()) -> term ().
 %%--------------------------------------------------------------------------------------------------
-terminate (Reason, #state{nodes = Nodes}) ->
+terminate (Reason, #s{nodes = Nodes}) ->
     lager:debug ("network terminate: ~p", [Reason]),
     [exit (Node, shutdown) || Node <- Nodes],
     ok.
@@ -252,7 +267,7 @@ terminate (Reason, #state{nodes = Nodes}) ->
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec code_change(OldVsn :: (term () | {down, term ()}), State :: term (), Extra :: term ()) ->
-    {ok, #state{}} |
+    {ok, #s{}} |
     {error, Reason :: term ()}.
 %%--------------------------------------------------------------------------------------------------
 code_change (_OldVsn, State, _Extra) ->
@@ -320,14 +335,16 @@ network_start_test_ () ->
            NetworkId = 0,
            {ok, Pid} = start_link (NetworkId),
            ?assert (is_pid (Pid)),
-           stop ()
+           stop (),
+           timer:sleep (300)
        end),
       ?_test
       (begin
            NetworkId = 1,
            {ok, Pid} = start_link (NetworkId),
            ?assert (is_pid (Pid)),
-           stop ()
+           stop (),
+           timer:sleep (300)
        end)]}.
 
 -endif.

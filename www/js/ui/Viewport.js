@@ -8,6 +8,7 @@ function initViewport (vnn)
     var gl = canvas.getContext ('webgl', { alpha: false });
 
     gl.enable (gl.DEPTH_TEST);
+    gl.depthFunc (gl.LEQUAL);
     gl.blendFunc (gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     var framebuffer = gl.createFramebuffer ();
@@ -27,7 +28,7 @@ function initViewport (vnn)
     gl.bindTexture (gl.TEXTURE_2D, null);
     gl.bindRenderbuffer (gl.RENDERBUFFER, null);
 
-    var mvMatrix = mat4.create (), pMatrix = mat4.create (), pPMatrix = mat4.create ();
+    var mvMatrix = mat4.create (), pMatrix = mat4.create ();
 
     initController (vnn, canvas, mvMatrix);
 
@@ -58,37 +59,59 @@ function initViewport (vnn)
         requestAnimationFrame (draw);
     }
 
+    vnn.messageReceived.add (function (buffer)
+    {
+        var type = new Uint32Array (buffer, 0, 1)[0];
+
+        switch (type)
+        {
+        case CONST.SPIKE:
+            var id = new Uint32Array (buffer, 4, 1)[0];
+            network.spike (id);
+            break;
+
+        case CONST.SELECTED_NEIGHBOUR:
+            var id = new Uint32Array (buffer, 4, 1)[0];
+            network.selected_neighbour (id);
+            break;
+
+        case CONST.SELECTED_INBOUND:
+            var id = new Uint32Array (buffer, 4, 1)[0];
+            network.selected_inbound (id);
+            break;
+
+        case CONST.SELECTED_OUTBOUND:
+            var id = new Uint32Array (buffer, 4, 1)[0];
+            network.selected_outbound (id);
+            break;
+
+        case CONST.POSITION:
+            var id = new Uint32Array (buffer, 4, 1)[0];
+            var pos = new Float32Array (buffer, 8,  3);
+            network.set (id, pos[0], pos[1], pos[2]);
+            break;
+
+        case CONST.CONNECTION:
+            var ids = new Uint32Array (buffer, 4, 2);
+            network.connect (ids[0], ids[1]);
+            break;
+
+        case CONST.NEW_NETWORK:
+            network.clear ();
+            break;
+        }
+    });
+
     function webGLIsNotSupported ()
     {
         try       { return !window.WebGLRenderingContext || !canvas.getContext ('webgl'); }
         catch (e) { return true; }
     };
 
-    vnn.messageReceived.add (function (buffer)
+    function rgbToInt (color)
     {
-        var type = new Uint32Array (buffer, 0, 1)[0];
-
-        if (type == CONST.SPIKE)
-        {
-            var id = new Uint32Array (buffer, 4, 1)[0];
-            network.spike (id);
-        }
-        else if (type == CONST.POSITION)
-        {
-            var id = new Uint32Array (buffer, 4, 1)[0];
-            var pos = new Float32Array (buffer, 8,  3);
-            network.set (id, pos[0], pos[1], pos[2]);
-        }
-        else if (type == CONST.CONNECTION)
-        {
-            var ids = new Uint32Array (buffer, 4, 2);
-            network.connect (ids[0], ids[1]);
-        }
-        else if (type == CONST.NEW_NETWORK)
-        {
-            network.clear ();
-        }
-    })
+        return color[0] + color[1] * 256 + color[2] * 65536;
+    }
 
     vnn.windowResized.add (function ()
     {
@@ -102,15 +125,15 @@ function initViewport (vnn)
     {
         var bytes = new Uint8Array (4);
         gl.readPixels (x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
-        var id = bytes[0] + bytes[1] * 256 + bytes[2] * 65536;
-        vnn.selectNode (id);
+        var id = rgbToInt (bytes);
+        network.select (id);
     });
 
     vnn.pickerMoved.add (function (x, y)
     {
         var bytes = new Uint8Array (4);
         gl.readPixels (x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
-        var id = bytes[0] + bytes[1] * 256 + bytes[2] * 65536;
+        var id = rgbToInt (bytes);
         network.hover (id);
     });
 

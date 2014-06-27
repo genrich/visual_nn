@@ -1,6 +1,6 @@
 function Network (gl, vnn)
 {
-    const FLOAT_SIZE = 4, INT_SIZE = 2,
+    const MAX_ID = 16777215, FLOAT_SIZE = 4, INT_SIZE = 2,
           // x, y, z
           POS_SIZE = 3,
           // x1, y1, z1, x2, y2, z3, duration, end_time
@@ -55,7 +55,6 @@ function Network (gl, vnn)
     nodeProgram.attenuation = gl.getUniformLocation (nodeProgram, 'attenuation');
     nodeProgram.rest_color  = gl.getUniformLocation (nodeProgram, 'rest_color');
     nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
-    nodeProgram.hover_color = gl.getUniformLocation (nodeProgram, 'hover_color');
     nodeProgram.point_size  = gl.getUniformLocation (nodeProgram, 'point_size');
 
     nodePickerProgram.id = gl.getAttribLocation (nodePickerProgram, 'id');
@@ -119,37 +118,86 @@ function Network (gl, vnn)
         if (adjacencyList[i] === undefined) adjacencyList[i] = [];
     }
 
-    var lastHoverId;
-    this.hover = function (id)
+    var selInbound = [], selOutbound = [], selNeighbours = [],
+        selInConnArray  = new Uint16Array (),
+        selOutConnArray = new Uint16Array (),
+        selInConnBuf  = gl.createBuffer (),
+        selOutConnBuf = gl.createBuffer (),
+        lastSelectedId = makeRef ();
+
+    this.select = function (id)
     {
-        if (id < CONST.MAX_ID)
-        {
-            if (lastHoverId == undefined || id != lastHoverId)
+        processSelection (lastSelectedId, id,
+            function (id)
             {
-                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = 1;
-                nodesToUpdate.push (id);
-            }
-            if (lastHoverId != id)
+                vnn.selectNode (id);
+            },
+            function (id) // called when selection is cleared
             {
-                nodesArray[lastHoverId * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
-                nodesToUpdate.push (lastHoverId);
-                lastHoverId = undefined;
-            }
-            lastHoverId = id;
-        }
-        else if (lastHoverId)
+                selInConnArray  = new Uint16Array ();
+                selOutConnArray = new Uint16Array ();
+                var clearAttrFun = function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = 0; nodesToUpdate.push (i); }
+                selInbound.   forEach (clearAttrFun);
+                selOutbound.  forEach (clearAttrFun);
+                selNeighbours.forEach (clearAttrFun);
+                selInbound    = [];
+                selOutbound   = [];
+                selNeighbours = [];
+            });
+    }
+
+    this.selected_neighbour = function (id)
+    {
+        if (lastSelectedId < MAX_ID)
         {
-            nodesArray[lastHoverId * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
-            nodesToUpdate.push (lastHoverId);
-            lastHoverId = undefined;
+            selNeighbours.push (id);
+            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.neighbour_color);
+            nodesToUpdate.push (id);
         }
     }
 
-    function prefill (id1, id2)
+    this.selected_inbound = function (id)
     {
-        var max = Math.max (id1, id2);
-        for (var id = numNodes; id <= max; ++id)
-            this.set (id, 0, 0, 0);
+        if (lastSelectedId < MAX_ID)
+        {
+            selInbound.push (id);
+            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.inbound_color);
+            nodesToUpdate.push (id);
+
+            var len = selInConnArray.length;
+            selInConnArray = reallocateUintArray (selInConnArray, len + 2);
+            selInConnArray[len]     = +lastSelectedId;
+            selInConnArray[len + 1] = id;
+
+            gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selInConnBuf);
+            gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, selInConnArray, gl.STATIC_DRAW);
+        }
+    }
+
+    this.selected_outbound = function (id)
+    {
+        if (lastSelectedId < MAX_ID)
+        {
+            selOutbound.push (id);
+            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.outbound_color);
+            nodesToUpdate.push (id);
+
+            var len = selOutConnArray.length;
+            selOutConnArray = reallocateUintArray (selOutConnArray, len + 2);
+            selOutConnArray[len]     = +lastSelectedId;
+            selOutConnArray[len + 1] = id;
+
+            gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selOutConnBuf);
+            gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, selOutConnArray, gl.STATIC_DRAW);
+        }
+    }
+
+    var lastHoverId = makeRef ();
+    this.hover = function (id)
+    {
+        processSelection (lastHoverId, id,
+                          function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.hover_color); },
+                          function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = 0; });
     }
 
     this.connect = function (from, to)
@@ -213,7 +261,6 @@ function Network (gl, vnn)
         gl.uniform1f (nodeProgram.point_size,  vnn.params.point_size);
         gl.uniform3fv (nodeProgram.rest_color,  vnn.params.rest_color);
         gl.uniform3fv (nodeProgram.spike_color, vnn.params.spike_color);
-        gl.uniform3fv (nodeProgram.hover_color, vnn.params.hover_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
 
@@ -252,8 +299,22 @@ function Network (gl, vnn)
 
             gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
         }
-
         gl.drawElements (gl.LINES, numEdges * 2, gl.UNSIGNED_SHORT, 0);
+
+        // selected inbound/outbound
+        if (selInConnArray.length)
+        {
+            gl.uniform3fv (connectionProgram.rest_color, vnn.params.inbound_color);
+            gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selInConnBuf);
+            gl.drawElements (gl.LINES, selInConnArray.length, gl.UNSIGNED_SHORT, 0);
+        }
+
+        if (selOutConnArray.length)
+        {
+            gl.uniform3fv (connectionProgram.rest_color, vnn.params.outbound_color);
+            gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selOutConnBuf);
+            gl.drawElements (gl.LINES, selOutConnArray.length, gl.UNSIGNED_SHORT, 0);
+        }
     }
 
     this.drawSpikes = function (pMatrix, mvMatrix, time) // draw spike propagation
@@ -263,8 +324,8 @@ function Network (gl, vnn)
         gl.enableVertexAttribArray (spikeProgram.duration);
         gl.enableVertexAttribArray (spikeProgram.end_time);
 
-        gl.uniform1f        (spikeProgram.time, time);
-        gl.uniform3fv       (spikeProgram.spike_color, vnn.params.spike_color);
+        gl.uniform1f (spikeProgram.time, time);
+        gl.uniform3fv (spikeProgram.spike_color, vnn.params.spike_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
@@ -323,6 +384,11 @@ function Network (gl, vnn)
                 gl.bufferSubData (gl.ARRAY_BUFFER, i * FLOAT_SIZE, a);
         }
 
+    }
+
+    function vecToInt (vec)
+    {
+        return (vec[0] * 255) + (vec[1] * 255) * 256 + (vec[2] * 255) * 65536;
     }
 
     function useProgram (program, pMatrix, mvMatrix)
@@ -409,6 +475,58 @@ function Network (gl, vnn)
         var newArray = new Float32Array (newLength);
         newArray.set (oldArray);
         return newArray;
+    }
+
+    function reallocateUintArray (oldArray, newLength)
+    {
+        var newArray = new Uint16Array (newLength);
+        newArray.set (oldArray);
+        return newArray;
+    }
+
+    function prefill (id1, id2)
+    {
+        var max = Math.max (id1, id2);
+        for (var id = numNodes; id <= max; ++id)
+            this.set (id, 0, 0, 0);
+    }
+
+    function makeRef ()
+    {
+        var value = MAX_ID;
+        var fun = function (w)
+        {
+            value = w;
+        };
+        fun.valueOf = function ()
+        {
+            return value;
+        };
+        return fun;
+    }
+
+    function processSelection (lastId, id, doSelection, clearSelection)
+    {
+        if (id < MAX_ID)
+        {
+            if (lastId == MAX_ID || lastId != id)
+            {
+                doSelection (id);
+                nodesToUpdate.push (id);
+            }
+            if (lastId != MAX_ID && lastId != id)
+            {
+                clearSelection (+lastId);
+                nodesToUpdate.push (+lastId);
+            }
+            lastId (id);
+        }
+        else if (lastId != MAX_ID)
+        {
+            clearSelection (+lastId);
+            nodesToUpdate.push (+lastId);
+            lastId (MAX_ID);
+        }
     }
 
     function makeShader (gl, src, type)

@@ -1,6 +1,6 @@
 function initController (vnn, canvas, mvMatrix)
 {
-    const FRAMEBUFFER_SIZE = 512;
+    const FRAMEBUFFER_RANGE = 511;
 
     var eye              = vec3.fromValues (1000, 100, 0),
         up               = vec3.fromValues (0, 1, 0),
@@ -28,8 +28,8 @@ function initController (vnn, canvas, mvMatrix)
         var newY = evnt.clientY;
         if (Math.abs (newX - mouseDownX) < 3 && Math.abs (newY - mouseDownY) < 3)
         {
-            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_SIZE);
-            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_SIZE);
+            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_RANGE);
+            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_RANGE);
             vnn.pickerClicked.dispatch (x, y);
         }
     }
@@ -104,8 +104,8 @@ function initController (vnn, canvas, mvMatrix)
         }
         else
         {
-            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_SIZE);
-            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_SIZE);
+            var x = Math.round (newX                   / canvas.width  * FRAMEBUFFER_RANGE);
+            var y = Math.round ((canvas.height - newY) / canvas.height * FRAMEBUFFER_RANGE);
             vnn.pickerMoved.dispatch (x, y);
         }
     }

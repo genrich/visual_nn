@@ -8,6 +8,9 @@
 -export ([start_link/0,
           add_handler/2,
           delete_handler/2,
+          notify_inbound/1,
+          notify_outbound/1,
+          notify_neighbour/1,
           notify_position/2,
           notify_connection/2,
           notify_spike/1,
@@ -48,12 +51,43 @@ delete_handler (Handler, Args) ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
+%% Notify node is inbound
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_inbound (non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_inbound (Id) ->
+    gen_event:notify (?MODULE, {notify_inbound, Id}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Notify node is outbound
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_outbound (non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_outbound (Id) ->
+    gen_event:notify (?MODULE, {notify_outbound, Id}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Notify node is neighbour
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_neighbour (non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_neighbour (Id) ->
+    gen_event:notify (?MODULE, {notify_neighbour, Id}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
 %% Notify node position
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec notify_position (Id, Position) -> ok when
-    Id       :: non_neg_integer (),
-    Position :: vnn_network:position ().
+-spec notify_position (non_neg_integer (), vnn_network:position ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
 notify_position (Id, Position) ->
     gen_event:notify (?MODULE, {notify_position, Id, Position}).

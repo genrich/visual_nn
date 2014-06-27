@@ -1,8 +1,6 @@
 Visual Neural Network
 =====================
 
-Random spiking network (in-browser simulation): [genrich.github.io/visual\_nn](http://genrich.github.io/visual_nn)
-
 Neural network Erlang node WebGL visualization. Build with erlang [rebar](https://github.com/rebar/rebar). Get rebar: `wget https://raw.github.com/wiki/rebar/rebar/rebar && chmod u+x rebar`
 
 Server(for simulation)  
