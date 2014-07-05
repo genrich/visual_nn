@@ -198,13 +198,15 @@ loop (#s{id             = Id,
 -spec generate_stimulus_spike (#s{}) -> #s{}.
 %%--------------------------------------------------------------------------------------------------
 generate_stimulus_spike (#s{type = stimulus_active} = State) ->
-    erlang:send_after (to_millis (vnn_random:exponential (?SPIKE_RATE)) + ?ABSOLUTE_REFRACTORY,
+    erlang:send_after (to_millis (vnn_random:exponential (vnn_params:spike_rate ())
+                                  + vnn_params:absolute_refractory ()),
                        self (),
                        spike),
     State;
 
 generate_stimulus_spike (#s{type = stimulus} = State) ->
-    erlang:send_after (to_millis (vnn_random:exponential (?NOISE_RATE)) + ?ABSOLUTE_REFRACTORY,
+    erlang:send_after (to_millis (vnn_random:exponential (vnn_params:noise_rate ())
+                                  + vnn_params:absolute_refractory ()),
                        self (),
                        spike),
     State.
@@ -281,7 +283,7 @@ consider_neighbour (Length, Node, Neighbours, _) ->
 %%--------------------------------------------------------------------------------------------------
 -spec to_millis (float ()) -> non_neg_integer ().
 %%--------------------------------------------------------------------------------------------------
-to_millis (SecondFraction) -> round (SecondFraction * 1000).
+to_millis (Seconds) -> round (Seconds * 1000).
 
 
 %%--------------------------------------------------------------------------------------------------

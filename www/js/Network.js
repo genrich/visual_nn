@@ -234,7 +234,7 @@ function Network (gl, vnn)
         if (v_idx < numNodes)
         {
             var i = v_idx * NODE_SIZE + NODE_END_TIME_OFFSET;
-            nodesArray[i] = time + vnn.params.spike_attenuation;
+            nodesArray[i] = time + vnn.params.absolute_refractory * vnn.params.slowdown;
 
             nodeSpikes.push (v_idx);
         }
@@ -243,7 +243,7 @@ function Network (gl, vnn)
         {
             var u_idx = adjacencyList[v_idx][i];
             var v = this.get (v_idx), u = this.get (u_idx);
-            var duration = vec3.distance (v, u) / vnn.params.spike_speed,
+            var duration = vec3.distance (v, u) / vnn.params.spike_speed * vnn.params.slowdown,
                 end_time = time + duration;
 
             radiatingSpikes.push (v[0], v[1], v[2], u[0], u[1], u[2], duration, end_time);
@@ -257,7 +257,7 @@ function Network (gl, vnn)
         gl.enableVertexAttribArray (nodeProgram.attributes);
 
         gl.uniform1f (nodeProgram.time,        time);
-        gl.uniform1f (nodeProgram.attenuation, vnn.params.spike_attenuation);
+        gl.uniform1f (nodeProgram.attenuation, vnn.params.absolute_refractory * vnn.params.slowdown);
         gl.uniform1f (nodeProgram.point_size,  vnn.params.point_size);
         gl.uniform3fv (nodeProgram.rest_color,  vnn.params.rest_color);
         gl.uniform3fv (nodeProgram.spike_color, vnn.params.spike_color);

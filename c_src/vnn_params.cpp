@@ -4,44 +4,81 @@
 
 using namespace std;
 
-static atomic<double> speed;
+#define PARAMS_MUL \
+    X (absolute_refractory)
 
-static ERL_NIF_TERM spike_speed (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    if (argc != 0) return enif_make_badarg (env);
+#define PARAMS_DIV  \
+    X (spike_speed) \
+    X (spike_rate)  \
+    X (noise_rate)
 
-    double value {speed.load ()};
+#define PARAMS   \
+    X (slowdown) \
+    PARAMS_DIV   \
+    PARAMS_MUL
 
-    return enif_make_double (env, value);
-}
+#define X(param) static atomic<double> param {1.0};
+PARAMS
+#undef X
 
-static ERL_NIF_TERM set_spike_speed (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    if (argc == 1)
-    {
-        double double_value;
-        int int_value;
-
-        if (enif_get_double (env, argv[0], &double_value))
-        {
-            speed.store (double_value);
-            return enif_make_double (env, double_value);
-        }
-        else if (enif_get_int (env, argv[0], &int_value))
-        {
-            double_value = static_cast<double> (int_value);
-            speed.store (double_value);
-            return enif_make_double (env, double_value);
-        }
+#define X(param)                                                                          \
+    static ERL_NIF_TERM get_##param (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) \
+    {                                                                                     \
+        return enif_make_double (env, param);                                             \
     }
+PARAMS
+#undef X
 
+#define X(param)                                                                          \
+    static ERL_NIF_TERM set_##param (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) \
+    {                                                                                     \
+        double value;                                                                     \
+        if (argc == 1 && enif_get_double (env, argv[0], &value))                          \
+        {                                                                                 \
+            param = value * slowdown;                                                     \
+            return enif_make_atom (env, "ok");                                            \
+        }                                                                                 \
+        return enif_make_badarg (env);                                                    \
+    }
+PARAMS_MUL
+#undef X
+
+#define X(param)                                                                          \
+    static ERL_NIF_TERM set_##param (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) \
+    {                                                                                     \
+        double value;                                                                     \
+        if (argc == 1 && enif_get_double (env, argv[0], &value))                          \
+        {                                                                                 \
+            param = value / slowdown;                                                     \
+            return enif_make_atom (env, "ok");                                            \
+        }                                                                                 \
+        return enif_make_badarg (env);                                                    \
+    }
+PARAMS_DIV
+#undef X
+
+static ERL_NIF_TERM set_slowdown (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    double value;
+    if (argc == 1 && enif_get_double (env, argv[0], &value))
+    {
+        double old_value = slowdown.exchange (value);
+#define X(param) param = param / old_value * value;
+        PARAMS_MUL
+#undef X
+#define X(param) param = param * old_value / value;
+        PARAMS_DIV
+#undef X
+        return enif_make_atom (env, "ok");
+    }
     return enif_make_badarg (env);
 }
 
 static ErlNifFunc nifs[] =
 {
-    {"spike_speed",     0, spike_speed},
-    {"set_spike_speed", 1, set_spike_speed}
+#define X(param) {#param, 0, get_##param}, {"set_"#param, 1, set_##param},
+    PARAMS
+#undef X
 };
 
 ERL_NIF_INIT (vnn_params, nifs, nullptr, nullptr, nullptr, nullptr)

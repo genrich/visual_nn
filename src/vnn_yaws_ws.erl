@@ -54,25 +54,25 @@ handle_open (WsState, State) ->
       RFC6455StatusCode :: integer (),
       Reason            :: binary ().
 %%--------------------------------------------------------------------------------------------------
-handle_message ({binary, <<?RECREATE_NETWORK:32/little, NetworkId:32/little>>}) ->
+handle_message ({binary, <<?MSG_RECREATE_NETWORK:32/little, NetworkId:32/little>>}) ->
     vnn_sup:stop_network  (),
     vnn_sup:start_network (NetworkId),
     noreply;
 
-handle_message ({binary, <<?START_SIMULATION:32/little>>}) ->
+handle_message ({binary, <<?MSG_START_SIMULATION:32/little>>}) ->
     vnn_network:sim_start (),
     noreply;
 
-handle_message ({binary, <<?STOP_SIMULATION:32/little>>}) ->
+handle_message ({binary, <<?MSG_STOP_SIMULATION:32/little>>}) ->
     vnn_network:sim_stop (),
     noreply;
 
-handle_message ({binary, <<?SELECT_NODE:32/little, Id:32/little>>}) ->
+handle_message ({binary, <<?MSG_SELECT_NODE:32/little, Id:32/little>>}) ->
     vnn_network:select_node (Id),
     noreply;
 
-handle_message ({binary, <<?SET_SPIKE_SPEED:32/little, Speed:32/little-float>>}) ->
-    vnn_network:set_spike_speed (Speed),
+handle_message ({binary, <<?MSG_SET_SLOWDOWN:32/little, Times:32/little-float>>}) ->
+    ok = vnn_params:set_slowdown (Times),
     noreply;
 
 handle_message ({Type, Data}) ->

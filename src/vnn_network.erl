@@ -10,7 +10,6 @@
           sim_start/0,
           sim_stop/0,
           select_node/1,
-          set_spike_speed/1,
           register_node/2,
           create_stimulus/5]).
 
@@ -87,17 +86,6 @@ select_node (Id) ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Set spike speed param
-%% @end
-%%--------------------------------------------------------------------------------------------------
--spec set_spike_speed (float ()) -> ok.
-%%--------------------------------------------------------------------------------------------------
-set_spike_speed (Speed) ->
-    gen_server:cast (?MODULE, {set_spike_speed, Speed}).
-
-
-%%--------------------------------------------------------------------------------------------------
-%% @doc
 %% Register node id to pid mapping
 %% @end
 %%--------------------------------------------------------------------------------------------------
@@ -116,7 +104,9 @@ register_node (Id, Node) ->
 -spec init (non_neg_integer ()) -> {ok, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 init (?NETWORK_0) ->
-    lager:debug ("network init 0"),
+    lager:debug ("network init 0, slowdown=~p, spike_speed=~p, spike_rate=~p, noise_rate=~p, absolute_refractory=~p",
+                [vnn_params:slowdown (), vnn_params:spike_speed (), vnn_params:spike_rate (), vnn_params:noise_rate (),
+                vnn_params:absolute_refractory ()]),
     process_flag (trap_exit, true),
 
     vnn_event:notify_new_network (),
@@ -164,7 +154,7 @@ init (?NETWORK_1) ->
     vnn_utils:reset_id (),
 
     Stimuli = vnn_stimulus:create (),
-    Layer1 = create_layer (1, 100),
+    Layer1 = create_layer (3, 100),
 
     [vnn_node:connect (Stimulus, Node1) || Stimulus <- Stimuli, Node1 <- Layer1, vnn_random:uniform () < 0.005],
 
@@ -219,10 +209,6 @@ handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
     vnn_node:notify_selected (Node),
     {noreply, State};
 
-handle_cast ({set_spike_speed, Speed}, #s{} = State) ->
-    vnn_params:set_spike_speed (Speed),
-    {noreply, State};
-
 handle_cast ({register_node, Id, Node}, #s{id_to_node = IdToNode} = State) ->
     {noreply, State#s{id_to_node = maps:put (Id, Node, IdToNode)}};
 
@@ -266,7 +252,7 @@ terminate (Reason, #s{nodes = Nodes}) ->
 %% Convert process state when code is changed
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec code_change(OldVsn :: (term () | {down, term ()}), State :: term (), Extra :: term ()) ->
+-spec code_change (OldVsn :: (term () | {down, term ()}), State :: term (), Extra :: term ()) ->
     {ok, #s{}} |
     {error, Reason :: term ()}.
 %%--------------------------------------------------------------------------------------------------

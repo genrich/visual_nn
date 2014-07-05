@@ -43,31 +43,33 @@ function main ()
         this.createNetwork = function (networkId)
         {
             notifyInfo ('Creating network...');
-            send (new Int32Array ([CONST.RECREATE_NETWORK, networkId]));
+            send (new Int32Array ([CONST.MSG_RECREATE_NETWORK, networkId]));
         }
 
         this.startSimulation = function ()
         {
             notifyInfo ('Starting simulation...');
-            send (new Uint32Array ([CONST.START_SIMULATION]));
+            send (new Uint32Array ([CONST.MSG_START_SIMULATION]));
         }
 
         this.stopSimulation = function ()
         {
             notifyInfo ('Stopping simulation...');
-            send (new Uint32Array ([CONST.STOP_SIMULATION]));
+            send (new Uint32Array ([CONST.MSG_STOP_SIMULATION]));
         }
 
         this.selectNode = function (id)
         {
-            send (new Uint32Array ([CONST.SELECT_NODE, id]));
+            send (new Uint32Array ([CONST.MSG_SELECT_NODE, id]));
         }
 
-        this.setSpikeSpeed = function (speed)
+        this.setSlowdown = function (value)
         {
+            vnn.params.slowdown = value;
+
             var buffer = new ArrayBuffer (8);
-            new Uint32Array  (buffer, 0, 1)[0] = CONST.SET_SPIKE_SPEED;
-            new Float32Array (buffer, 4, 1)[0] = speed;
+            new Uint32Array  (buffer, 0, 1)[0] = CONST.MSG_SET_SLOWDOWN;
+            new Float32Array (buffer, 4, 1)[0] = value;
 
             send (buffer);
         }

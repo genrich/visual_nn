@@ -65,38 +65,38 @@ function initViewport (vnn)
 
         switch (type)
         {
-        case CONST.SPIKE:
+        case CONST.MSG_SPIKE:
             var id = new Uint32Array (buffer, 4, 1)[0];
             network.spike (id);
             break;
 
-        case CONST.SELECTED_NEIGHBOUR:
+        case CONST.MSG_SELECTED_NEIGHBOUR:
             var id = new Uint32Array (buffer, 4, 1)[0];
             network.selected_neighbour (id);
             break;
 
-        case CONST.SELECTED_INBOUND:
+        case CONST.MSG_SELECTED_INBOUND:
             var id = new Uint32Array (buffer, 4, 1)[0];
             network.selected_inbound (id);
             break;
 
-        case CONST.SELECTED_OUTBOUND:
+        case CONST.MSG_SELECTED_OUTBOUND:
             var id = new Uint32Array (buffer, 4, 1)[0];
             network.selected_outbound (id);
             break;
 
-        case CONST.POSITION:
+        case CONST.MSG_POSITION:
             var id = new Uint32Array (buffer, 4, 1)[0];
             var pos = new Float32Array (buffer, 8,  3);
             network.set (id, pos[0], pos[1], pos[2]);
             break;
 
-        case CONST.CONNECTION:
+        case CONST.MSG_CONNECTION:
             var ids = new Uint32Array (buffer, 4, 2);
             network.connect (ids[0], ids[1]);
             break;
 
-        case CONST.NEW_NETWORK:
+        case CONST.MSG_NEW_NETWORK:
             network.clear ();
             break;
         }

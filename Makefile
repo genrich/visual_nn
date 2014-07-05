@@ -18,11 +18,11 @@ deps/yaws:
 	rebar get-deps compile
 
 www/js/Const.js: include/const.hrl
-	@awk   'BEGIN 		    { print "var CONST =\n{" };                                                      \
-			$$1 ~ /^$$/     { print };                                                                       \
-			$$1 ~ /%%/      { $$1 = "    //"; print $$0 };                                                   \
-			$$1 ~ /-define/ { $$1 = "   "; gsub ("[()]", ""); sub (",", ":"); sub ("\\.", ","); print $$0 }; \
-			END 			{ print "}" }'                                                                   \
+	@awk   'BEGIN 		    { print "var CONST =\n{" };                                                                    \
+			$$1 ~ /^$$/     { print };                                                                                     \
+			$$1 ~ /%%/      { $$1 = "    //"; print $$0 };                                                                 \
+			$$1 ~ /-define/ { $$1 = "   "; gsub ("[()]", ""); sub (",", ":"); sub ("\\.(\\s*%(.*))?$$", ","); print $$0 }; \
+			END             { print "}" }'                                                                                 \
 	$^ > $@
 
 compile: deps/yaws www/js/Const.js

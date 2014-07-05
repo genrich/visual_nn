@@ -29,8 +29,9 @@ function initParametrization (vnn)
         this.outbound_color   = toColor (this.outbound_color_hex);
         this.neighbour_color  = toColor (this.neighbour_color_hex);
 
-        this.spike_speed       = CONST.SPIKE_SPEED;
-        this.spike_attenuation = 3.0;
+        this.slowdown            = CONST.PARAM_SLOWDOWN;
+        this.spike_speed         = CONST.PARAM_SPIKE_SPEED;
+        this.absolute_refractory = CONST.PARAM_ABSOLUTE_REFRACTORY;
 
         this.networkId = 0;
 
@@ -86,8 +87,8 @@ function initParametrization (vnn)
 
     var simulationControl = gui.add (vnn.params, 'simulationToggle').name ('start simulation');
 
-    gui.add (vnn.params, 'spike_attenuation', 0.1, 15).name ('spike attenuation');
-    gui.add (vnn.params, 'spike_speed', 10, 150).name ('spike speed').onFinishChange (function (value) { vnn.setSpikeSpeed (value); });
+    gui.add (vnn.params, 'slowdown', vnn.params.slowdown / 2, vnn.params.slowdown * 10)
+        .onFinishChange (function (value) { vnn.setSlowdown (value); });
 
     gui.add (vnn.params, 'help');
 

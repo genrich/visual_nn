@@ -1,21 +1,25 @@
 %% Client messages
--define (RECREATE_NETWORK, 0).
--define (START_SIMULATION, 1).
--define (STOP_SIMULATION,  2).
--define (SELECT_NODE,      3).
--define (SET_SPIKE_SPEED,  4).
+-define (MSG_RECREATE_NETWORK, 0).
+-define (MSG_START_SIMULATION, 1).
+-define (MSG_STOP_SIMULATION,  2).
+-define (MSG_SELECT_NODE,      3).
+-define (MSG_SET_SLOWDOWN,     4).
 
 %% Server messages
--define (SPIKE,              0).
--define (SELECTED_NEIGHBOUR, 1).
--define (SELECTED_INBOUND,   2).
--define (SELECTED_OUTBOUND,  3).
--define (POSITION,           4).
--define (CONNECTION,         5).
--define (NEW_NETWORK,        6).
+-define (MSG_SPIKE,              0).
+-define (MSG_SELECTED_NEIGHBOUR, 1).
+-define (MSG_SELECTED_INBOUND,   2).
+-define (MSG_SELECTED_OUTBOUND,  3).
+-define (MSG_POSITION,           4).
+-define (MSG_CONNECTION,         5).
+-define (MSG_NEW_NETWORK,        6).
 
 %% Params
--define (SPIKE_SPEED, 100).
+-define (PARAM_SLOWDOWN,            10000.0).    % times slower
+-define (PARAM_SPIKE_SPEED,         25000000.0). % microns/sec
+-define (PARAM_SPIKE_RATE,          700.0).      % spikes/sec
+-define (PARAM_NOISE_RATE,          10.0).       % spikes/sec
+-define (PARAM_ABSOLUTE_REFRACTORY, 0.001).      % sec
 
 -define (STIMULUS_HELLO_WORLD, 0).
 
