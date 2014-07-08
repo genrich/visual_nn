@@ -33,8 +33,9 @@ function Network (gl, vnn)
     var numNodes = 0, nodesArray = new Float32Array (NODE_BUF_INC), nodesToUpdate = [], isNodesBufferFresh = true, nodeSpikes = [];
     // adjacency list, adjacencyList[v_idx] = [u_idx : adjacent_vertex (v_idx), e_idx : corresponding_edge_idx (v_idx, u_idx), ...]
     var adjacencyList = [];
-    // edge list, edges = [v_idx, u_idx, ...]
-    var edges = [], numEdges = 0; edgesArray = new Uint16Array (EDGE_BUF_INC);
+    // edgesArray = [v_idx, u_idx, ...]
+    var numEdges = 0, edgesArray = new Uint16Array (EDGE_BUF_INC), isEdgesBufferFresh = true;
+    var edgeSpikesArray = new Float32Array ();
     // spike array, [pos_start, pos_end, duration, end_time]
     var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0, radiatingSpikes = [];
     var heap = new MinBinaryHeap ();
@@ -45,9 +46,9 @@ function Network (gl, vnn)
         connectionProgram = initProgram (gl, 'connection'),
         spikeProgram      = initProgram (gl, 'spike');
 
-    var nodesBuffer     = gl.createBuffer (),
-        lineIndexBuffer = gl.createBuffer (),
-        spikeBuffer     = gl.createBuffer ();
+    var nodesBuffer = gl.createBuffer (),
+        edgesBuffer = gl.createBuffer (),
+        spikeBuffer = gl.createBuffer ();
 
     nodeProgram.end_time   = gl.getAttribLocation (nodeProgram, 'end_time');
     nodeProgram.attributes = gl.getAttribLocation (nodeProgram, 'attributes');
@@ -71,7 +72,7 @@ function Network (gl, vnn)
     gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
     gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
 
-    gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+    gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, edgesBuffer);
     gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
 
     gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
@@ -82,7 +83,7 @@ function Network (gl, vnn)
         numNodes = 0; nodesToUpdate = [];
         numSpikes = 0; nodeSpikes = [];
         adjacencyList = [];
-        numEdges = 0; edges = [];
+        numEdges = 0;
         edgeSpikesPool = new PseudoQueue ();
         radiatingSpikes = [];
         heap = new MinBinaryHeap ();
@@ -212,15 +213,15 @@ function Network (gl, vnn)
                 return;
 
         adjacencyList[from].push (to, numEdges);
-        edges.push (from, to);
+        if (edgesArray.length < numEdges * 2 + 1)
+            edgesArray = reallocateUintArray (edgesArray, (numEdges + 1) * 2 + EDGE_BUF_INC);
+
+        edgesArray[numEdges * 2]     = from;
+        edgesArray[numEdges * 2 + 1] = to;
+
+        isEdgesBufferFresh = false;
 
         prefill (from, to);
-
-        var i_start = numEdges * 2;
-        var i_end   = i_start  + 2;
-
-        if (i_end <= edgesArray.length)
-            updateLineData (i_start, i_end, from, to);
 
         ++numEdges;
     }
@@ -283,22 +284,10 @@ function Network (gl, vnn)
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
         gl.vertexAttribPointer (connectionProgram.position, POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
 
-        gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+        gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, edgesBuffer);
 
-        if (edges.length > edgesArray.length) // reallocate
-        {
-            numEdges = edges.length / 2;
+        updateEdges ();
 
-            var i_start = edgesArray.length;
-
-            var a = new Uint16Array (edges.length + EDGE_BUF_INC);
-            a.set (edgesArray);
-            edgesArray = a;
-
-            edgesArray.set (edges.slice (i_start), i_start);
-
-            gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
-        }
         gl.drawElements (gl.LINES, numEdges * 2, gl.UNSIGNED_SHORT, 0);
 
         // selected inbound/outbound
@@ -371,6 +360,15 @@ function Network (gl, vnn)
         {
             gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
             isNodesBufferFresh = true;
+        }
+    }
+
+    function updateEdges ()
+    {
+        if (!isEdgesBufferFresh)
+        {
+            gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, edgesArray, gl.DYNAMIC_DRAW);
+            isEdgesBufferFresh = true;
         }
     }
 
@@ -458,16 +456,6 @@ function Network (gl, vnn)
             gl.bufferSubData (gl.ARRAY_BUFFER, i_start * FLOAT_SIZE, spikesArray.subarray (i_start, i_end));
         }
         radiatingSpikes.length = 0;
-    }
-
-    function updateLineData (i_start, i_end, from, to)
-    {
-        gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
-
-        edgesArray.set ([from, to], i_start);
-        var linesSubArray = edgesArray.subarray (i_start, i_end);
-
-        gl.bufferSubData (gl.ELEMENT_ARRAY_BUFFER, i_start * INT_SIZE, linesSubArray);
     }
 
     function reallocateFloatArray (oldArray, newLength)

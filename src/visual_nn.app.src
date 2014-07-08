@@ -1,7 +1,7 @@
 {application, visual_nn,
  [
   {description, "Visual Neural Network"},
-  {vsn, "0.1"},
+  {vsn, "0.2"},
   {registered, [vnn_sup, vnn_yaws_sup]},
   {applications, [kernel, stdlib]},
   {mod, { vnn_app, []}},
