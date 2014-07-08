@@ -7,6 +7,8 @@
 
 -export ([create/2,
           connect/2,
+          start/1,
+          stop/1,
           notify_selected/1,
           notify_position/1,
           notify_connections/1,
@@ -21,7 +23,7 @@
              type                     :: vnn_network:node_type (),
              position                 :: vnn_network:position (),
              node_to_length = #{}     :: #{pid () => float ()},
-             is_simulation            :: boolean (),
+             is_active = false        :: boolean (),
              inbound    = sets:new () :: sets:set (),
              outbound   = sets:new () :: sets:set (),
              neighbours = []          :: neighbours_list ()}).
@@ -51,6 +53,29 @@ connect (FromPid, ToPid) ->
     FromPid ! {connect_b, ToPid},
     ok.
 
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Start stimulus activity
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec start (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+start (Stimulus) ->
+    Stimulus ! start,
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Stop stimulus activity
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec stop (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+stop (Stimulus) ->
+    Stimulus ! stop,
+    ok.
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
@@ -109,6 +134,7 @@ consider_neighbours (PidA, PidB) ->
 -spec loop (#s{}) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
 loop (#s{id             = Id,
+         type           = Type,
          position       = Position,
          node_to_length = NodeToLength,
          inbound        = Inbound,
@@ -117,17 +143,31 @@ loop (#s{id             = Id,
       = State) ->
     NewState =
     receive
-        spike ->
-            spike (State);
+        spike when State#s.is_active ->
+            process_spike (State);
 
-        neighbour_spike ->
+        spike ->
             State;
 
-        sim_start ->
-            generate_stimulus_spike (State#s{is_simulation = true});
+        start when Type == stimulus_active;
+                   Type == stimulus_rest ->
+            [start (Node) || Node <- sets:to_list (Outbound)],
+            spike_after (vnn_stimulus:next_spike (Type)),
+            State#s{is_active = true};
 
-        sim_stop ->
-            State#s{is_simulation = false};
+        start when State#s.is_active == false ->
+            [start (Node) || Node <- sets:to_list (Outbound)],
+            State#s{is_active = true};
+
+        start ->
+            State;
+
+        stop when State#s.is_active ->
+            [stop (Node) || Node <- sets:to_list (Outbound)],
+            State#s{is_active = false};
+
+        stop ->
+            State;
 
         notify_selected ->
             [NodeB ! notify_inbound   || NodeB      <- sets:to_list (Inbound)],
@@ -194,59 +234,42 @@ loop (#s{id             = Id,
     end,
     vnn_node:loop (NewState).
 
-%%--------------------------------------------------------------------------------------------------
--spec generate_stimulus_spike (#s{}) -> #s{}.
-%%--------------------------------------------------------------------------------------------------
-generate_stimulus_spike (#s{type = stimulus_active} = State) ->
-    erlang:send_after (to_millis (vnn_random:exponential (vnn_params:spike_rate ())
-                                  + vnn_params:absolute_refractory ()),
-                       self (),
-                       spike),
-    State;
 
-generate_stimulus_spike (#s{type = stimulus} = State) ->
-    erlang:send_after (to_millis (vnn_random:exponential (vnn_params:noise_rate ())
-                                  + vnn_params:absolute_refractory ()),
-                       self (),
-                       spike),
-    State.
+%%--------------------------------------------------------------------------------------------------
+-spec spike_after (float ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+spike_after (Time) ->
+    spike_after (Time, self ()).
 
 
 %%--------------------------------------------------------------------------------------------------
--spec spike (#s{}) -> #s{}.
+-spec spike_after (float (), pid ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-spike (#s{type           = stimulus_active,
-          is_simulation  = true,
-          id             = Id,
-          node_to_length = NodeToLength,
-          outbound       = Outbound}
-       = State) ->
-    propagate_spikes (Id, Outbound, NodeToLength),
-    generate_stimulus_spike (State);
+spike_after (Time, Node) ->
+    Millis = to_millis (Time),
+    case Millis < 10 of
+        true  -> Node ! spike;
+        false -> erlang:send_after (Millis, Node, spike)
+    end,
+    ok.
 
-spike (#s{type           = stimulus,
-          is_simulation  = true,
-          id             = Id,
-          node_to_length = NodeToLength,
-          outbound       = Outbound}
-       = State) ->
-    propagate_spikes (Id, Outbound, NodeToLength),
-    generate_stimulus_spike (State);
 
-spike (#s{type           = neuron,
-          id             = Id,
-          node_to_length = NodeToLength,
-          outbound       = Outbound}
-       = State) ->
+%%--------------------------------------------------------------------------------------------------
+-spec process_spike (#s{}) -> #s{}.
+%%--------------------------------------------------------------------------------------------------
+process_spike (#s{type           = neuron,
+                  id             = Id,
+                  node_to_length = NodeToLength,
+                  outbound       = Outbound}
+               = State) ->
     case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound, NodeToLength);
                                         false -> undefined
     end,
     State;
 
-spike (#s{is_simulation = false} = State) ->
-    State;
-
-spike (#s{} = State) ->
+process_spike (#s{id = Id, node_to_length = NodeToLength, outbound = Outbound} = State) ->
+    propagate_spikes (Id, Outbound, NodeToLength),
+    spike_after (vnn_stimulus:next_spike (State#s.type) + vnn_params:absolute_refractory ()),
     State.
 
 
@@ -258,8 +281,7 @@ propagate_spikes (NodeAId, Outbound, NodeToLength) ->
     F = fun (NodeB) ->
                 %% Length = get (NodeB),
                 Length = maps:get (NodeB, NodeToLength),
-                SpikeTravelDuration = to_millis (Length / vnn_params:spike_speed ()),
-                erlang:send_after (SpikeTravelDuration, NodeB, spike)
+                spike_after (Length / vnn_params:spike_speed (), NodeB)
         end,
     [F (NodeB) || NodeB <- sets:to_list (Outbound)],
     ok.

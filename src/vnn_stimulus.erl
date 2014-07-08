@@ -5,7 +5,7 @@
 %%--------------------------------------------------------------------------------------------------
 -module (vnn_stimulus).
 
--export ([create/0]).
+-export ([create/0, next_spike/1]).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -63,3 +63,17 @@ create (String, Stride, Lines, Fun) ->
                             ($ , {I,  J,    Strd}) ->                  {Fun (Stride, Lines, I, J, stimulus),         {I, J+1, Strd}} end,
                         {0, 0, Stride}, String),
     Pids.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Return next spike time
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec next_spike (stimulus_active | stimulus_rest) -> float ().
+%%--------------------------------------------------------------------------------------------------
+next_spike (stimulus_active) ->
+    vnn_random:exponential (vnn_params:active_rate ());
+
+next_spike (stimulus_rest) ->
+    vnn_random:exponential (vnn_params:rest_rate ()).

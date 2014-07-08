@@ -19,7 +19,7 @@
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -type position ()  :: {X :: number (), Y :: number (), Z :: number ()}.
--type node_type () :: stimulus_active | stimulus | neuron.
+-type node_type () :: stimulus_active | stimulus_rest | neuron.
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -104,9 +104,7 @@ register_node (Id, Node) ->
 -spec init (non_neg_integer ()) -> {ok, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 init (?NETWORK_0) ->
-    lager:debug ("network init 0, slowdown=~p, spike_speed=~p, spike_rate=~p, noise_rate=~p, absolute_refractory=~p",
-                [vnn_params:slowdown (), vnn_params:spike_speed (), vnn_params:spike_rate (), vnn_params:noise_rate (),
-                vnn_params:absolute_refractory ()]),
+    lager:debug ("network init 0"),
     process_flag (trap_exit, true),
 
     vnn_event:notify_new_network (),
@@ -154,13 +152,13 @@ init (?NETWORK_1) ->
     vnn_utils:reset_id (),
 
     Stimuli = vnn_stimulus:create (),
-    Layer1 = create_layer (3, 100),
+    Layer = create_layer (3, 100),
 
-    [vnn_node:connect (Stimulus, Node1) || Stimulus <- Stimuli, Node1 <- Layer1, vnn_random:uniform () < 0.005],
+    [vnn_node:connect (Stimulus, Node1) || Stimulus <- Stimuli, Node1 <- Layer, vnn_random:uniform () < 0.005],
 
-    neighbours (Layer1),
+    neighbours (Layer),
 
-    Nodes = Stimuli ++ Layer1,
+    Nodes = Stimuli ++ Layer,
     [Node ! notify_position    || Node <- Nodes],
     [Node ! notify_connections || Node <- Nodes],
 
@@ -195,13 +193,13 @@ handle_call (_Request, _From, State) ->
 %%--------------------------------------------------------------------------------------------------
 handle_cast (sim_start, #s{stimuli = Stimuli} = State) ->
     lager:debug ("sim_start"),
-    [Stimulus ! sim_start || Stimulus <- Stimuli],
+    [vnn_node:start (Stimulus) || Stimulus <- Stimuli],
 
     {noreply, State};
 
 handle_cast (sim_stop, #s{stimuli = Stimuli} = State) ->
     lager:debug ("sim_stop"),
-    [Stimulus ! sim_stop || Stimulus <- Stimuli],
+    [vnn_node:stop (Stimulus) || Stimulus <- Stimuli],
     {noreply, State};
 
 handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->

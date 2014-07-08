@@ -17,8 +17,8 @@
 %% Params
 -define (PARAM_SLOWDOWN,            10000.0).    % times slower
 -define (PARAM_SPIKE_SPEED,         25000000.0). % microns/sec
--define (PARAM_SPIKE_RATE,          700.0).      % spikes/sec
--define (PARAM_NOISE_RATE,          10.0).       % spikes/sec
+-define (PARAM_ACTIVE_RATE,         700.0).      % spikes/sec
+-define (PARAM_REST_RATE,           10.0).       % spikes/sec
 -define (PARAM_ABSOLUTE_REFRACTORY, 0.001).      % sec
 
 -define (STIMULUS_HELLO_WORLD, 0).

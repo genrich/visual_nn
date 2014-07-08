@@ -8,13 +8,13 @@
 -export ([
           slowdown/0,
           spike_speed/0,
-          spike_rate/0,
-          noise_rate/0,
+          active_rate/0,
+          rest_rate/0,
           absolute_refractory/0,
           set_slowdown/1,
           set_spike_speed/1,
-          set_spike_rate/1,
-          set_noise_rate/1,
+          set_active_rate/1,
+          set_rest_rate/1,
           set_absolute_refractory/1
          ]).
 
@@ -44,8 +44,8 @@ init () ->
     end,
     set_slowdown (?PARAM_SLOWDOWN),
     set_spike_speed (?PARAM_SPIKE_SPEED),
-    set_spike_rate (?PARAM_SPIKE_RATE),
-    set_noise_rate (?PARAM_NOISE_RATE),
+    set_active_rate (?PARAM_ACTIVE_RATE),
+    set_rest_rate (?PARAM_REST_RATE),
     set_absolute_refractory (?PARAM_ABSOLUTE_REFRACTORY),
     ok.
 
@@ -99,9 +99,9 @@ set_spike_speed (_) ->
 %% Get stimulus spike rate
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec spike_rate () -> float ().
+-spec active_rate () -> float ().
 %%--------------------------------------------------------------------------------------------------
-spike_rate () ->
+active_rate () ->
     erlang:nif_error (nif_not_loaded).
 
 
@@ -110,9 +110,9 @@ spike_rate () ->
 %% Set stimulus spike rate
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec set_spike_rate (float ()) -> ok.
+-spec set_active_rate (float ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-set_spike_rate (_) ->
+set_active_rate (_) ->
     erlang:nif_error (nif_not_loaded).
 
 
@@ -121,9 +121,9 @@ set_spike_rate (_) ->
 %% Get stimulus noise rate
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec noise_rate () -> float ().
+-spec rest_rate () -> float ().
 %%--------------------------------------------------------------------------------------------------
-noise_rate () ->
+rest_rate () ->
     erlang:nif_error (nif_not_loaded).
 
 
@@ -132,9 +132,9 @@ noise_rate () ->
 %% Set stimulus noise rate
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec set_noise_rate (float ()) -> ok.
+-spec set_rest_rate (float ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-set_noise_rate (_) ->
+set_rest_rate (_) ->
     erlang:nif_error (nif_not_loaded).
 
 
