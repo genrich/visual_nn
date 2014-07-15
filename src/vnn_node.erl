@@ -10,8 +10,6 @@
           start/1,
           stop/1,
           notify_selected/1,
-          notify_position/1,
-          notify_connections/1,
           consider_neighbours/2,
           loop/1]).
 
@@ -38,6 +36,7 @@
 %%--------------------------------------------------------------------------------------------------
 create (Type, Position) ->
     Id = vnn_utils:id (),
+    vnn_event:notify_position (Id, Position),
     vnn_network:register_node (Id, self ()),
     vnn_node:loop (#s{id = Id, type = Type, position = Position}).
 
@@ -86,30 +85,6 @@ stop (Stimulus) ->
 %%--------------------------------------------------------------------------------------------------
 notify_selected (Node) ->
     Node ! notify_selected,
-    ok.
-
-
-%%--------------------------------------------------------------------------------------------------
-%% @doc
-%% Make node notify event handler about its position
-%% @end
-%%--------------------------------------------------------------------------------------------------
--spec notify_position (pid ()) -> ok.
-%%--------------------------------------------------------------------------------------------------
-notify_position (Node) ->
-    Node ! notify_position,
-    ok.
-
-
-%%--------------------------------------------------------------------------------------------------
-%% @doc
-%% Make node notify event handler about its outbound connections
-%% @end
-%%--------------------------------------------------------------------------------------------------
--spec notify_connections (pid ()) -> ok.
-%%--------------------------------------------------------------------------------------------------
-notify_connections (Node) ->
-    Node ! notify_connections,
     ok.
 
 
@@ -176,27 +151,15 @@ loop (#s{id             = Id,
             State;
 
         notify_inbound ->
-            ok = vnn_event:notify_inbound (Id),
+            vnn_event:notify_inbound (Id),
             State;
 
         notify_outbound ->
-            ok = vnn_event:notify_outbound (Id),
+            vnn_event:notify_outbound (Id),
             State;
 
         notify_neighbour ->
-            ok = vnn_event:notify_neighbour (Id),
-            State;
-
-        notify_position ->
-            ok = vnn_event:notify_position (Id, Position),
-            State;
-
-        notify_connections ->
-            [NodeB ! {notify_connection, Id} || NodeB <- sets:to_list (Outbound)],
-            State;
-
-        {notify_connection, NodeA} ->
-            ok = vnn_event:notify_connection (NodeA, Id),
+            vnn_event:notify_neighbour (Id),
             State;
 
         {connect_b, NodeB} ->
@@ -205,11 +168,12 @@ loop (#s{id             = Id,
 
         {connect_a, NodeA, PositionA} ->
             Length = length (PositionA, Position),
-            NodeA ! {connect_b, self (), Length},
+            NodeA ! {connect_b, self (), Id, Length},
             State#s{inbound = sets:add_element (NodeA, Inbound)};
 
-        {connect_b, NodeB, Length} ->
+        {connect_b, NodeB, NodeBId, Length} ->
             %% put (NodeB, Length),
+            vnn_event:notify_connection (Id, NodeBId),
             State#s{outbound       = sets:add_element (NodeB, Outbound),
                     node_to_length = maps:put (NodeB, Length, NodeToLength)};
 
@@ -277,7 +241,7 @@ process_spike (#s{id = Id, node_to_length = NodeToLength, outbound = Outbound} =
 -spec propagate_spikes (non_neg_integer (), sets:set (), #{pid () => float ()}) -> ok.
 %%--------------------------------------------------------------------------------------------------
 propagate_spikes (NodeAId, Outbound, NodeToLength) ->
-    ok = vnn_event:notify_spike (NodeAId),
+    vnn_event:notify_spike (NodeAId),
     F = fun (NodeB) ->
                 %% Length = get (NodeB),
                 Length = maps:get (NodeB, NodeToLength),

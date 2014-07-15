@@ -15,7 +15,6 @@ uniform vec3 rest_color;
 uniform vec3 spike_color;
 
 varying vec3 color;
-
 varying float depth;
 
 void main (void)
@@ -24,13 +23,15 @@ void main (void)
                             mod (floor (attributes / 256.0),   256.0) / 255.0,
                             mod (floor (attributes / 65536.0), 256.0) / 255.0);
 
-    if (time > end_time)
+    float end_time_with_attenuation = end_time + attenuation;
+
+    if (end_time_with_attenuation < time)
     {
         color = attributes == 0.0 ? rest_color : attr_color;
     }
     else
     {
-        float t = (end_time - time) / attenuation;
+        float t = (end_time_with_attenuation - time) / attenuation;
         float t1 = t * t;
         float t2 = t * t;
         float spike_strength = t1 * t2;

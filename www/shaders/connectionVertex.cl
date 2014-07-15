@@ -2,8 +2,10 @@ attribute vec3 position;
 
 uniform mat4 mvMatrix;
 uniform mat4 pMatrix;
+
 uniform float log_far_const;
 uniform float far;
+
 
 varying float depth;
 

@@ -25,3 +25,4 @@
 
 -define (NETWORK_0, 0).
 -define (NETWORK_1, 1).
+-define (NETWORK_2, 2).

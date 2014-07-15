@@ -138,8 +138,6 @@ init (?NETWORK_0) ->
     neighbours (Layers),
 
     Nodes = Stimuli ++ Layers,
-    [vnn_node:notify_position    (Node) || Node <- Nodes],
-    [vnn_node:notify_connections (Node) || Node <- Nodes],
 
     {ok, #s{stimuli = Stimuli, nodes = Nodes}};
 
@@ -159,10 +157,23 @@ init (?NETWORK_1) ->
     neighbours (Layer),
 
     Nodes = Stimuli ++ Layer,
-    [Node ! notify_position    || Node <- Nodes],
-    [Node ! notify_connections || Node <- Nodes],
 
-    {ok, #s{stimuli = Stimuli, nodes = Nodes}}.
+    {ok, #s{stimuli = Stimuli, nodes = Nodes}};
+
+init (?NETWORK_2) ->
+    lager:debug ("network init 2"),
+    process_flag (trap_exit, true),
+
+    vnn_event:notify_new_network (),
+
+    vnn_utils:reset_id (),
+
+    Stimulus = spawn (vnn_node, create, [stimulus_active, {0, -300.0, 0}]),
+    Node     = spawn (vnn_node, create, [neuron, {0, 300, 0}]),
+
+    vnn_node:connect (Stimulus, Node),
+
+    {ok, #s{stimuli = [Stimulus], nodes = [Node]}}.
 
 %%--------------------------------------------------------------------------------------------------
 %% @private

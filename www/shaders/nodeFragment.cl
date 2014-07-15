@@ -3,7 +3,6 @@ precision mediump float;
 uniform vec3 clear_color;
 
 varying vec3 color;
-
 varying float depth;
 
 void main (void)

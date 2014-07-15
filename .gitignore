@@ -6,6 +6,7 @@ ebin/
 .rebar/
 log/
 priv/
+test/shader/bin/
 deps_plt
 report.log
 *.swp

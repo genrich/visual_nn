@@ -1,10 +1,15 @@
-.PHONY: all doc readme compile shell report run run_debug test dialyzer typer clean clean_all
+.PHONY: all doc readme compile compile_test_shaders shell report run run_debug test test_shaders dialyzer typer clean clean_all
+
+CXXFLAGS+=-g -MMD -MP -std=c++1y -fdiagnostics-color=auto -fno-operator-names
 
 DEPS=goldrush lager ibrowse yaws
 PLT_APPS=erts kernel stdlib $(DEPS)
 
 PA_DEPS_EBIN=$(DEPS:%=-pa deps/%/ebin)
 EBINS=$(PA_DEPS_EBIN) -pa ../visual_nn/ebin
+
+SHADER_TESTS=$(patsubst test/shader/%.cpp, test/shader/bin/%.test, $(wildcard test/shader/*.cpp))
+SHADER_DEPS=$(patsubst %.test, %.d, $(SHADER_TESTS))
 
 all: compile
 
@@ -45,6 +50,19 @@ run_debug: compile
 test:
 	@rebar skip_deps=true eunit $(TEST_CASE)
 
+test/shader/bin:
+	mkdir -p $@
+
+test/shader/bin/%.test: test/shader/%.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+compile_test_shaders: test/shader/bin $(SHADER_TESTS)
+
+test_shaders: compile_test_shaders
+	@for i in $$(find test/shader/bin -name *.test -type f); do $$i; if [[ $$? -ne 0 ]]; then exit 1; fi; done; echo 'shaders OK.'
+
+-include $(SHADER_DEPS)
+
 deps_plt: deps/yaws
 	sed -i 's/no_debug_info/debug_info/' deps/yaws/rebar.config
 	rebar -r clean compile
@@ -61,6 +79,7 @@ typer:
 
 clean:
 	rebar skip_deps=true clean
+	rm -rf test/shader/bin
 
 clean_all: clean
 	rm -f deps_plt README.html report.log

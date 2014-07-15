@@ -13,7 +13,7 @@ function initParametrization (vnn)
         this.clear_color_hex      = '#b3b3b3';
         this.rest_color_hex       = '#323232';
         this.connection_color_hex = '#7f7f7f';
-        this.spike_color_hex      = '#e6e600';
+        this.spike_color_hex      = '#ffff00';
         this.hover_color_hex      = '#e60000';
         this.selected_color_hex   = '#b30000';
         this.inbound_color_hex    = '#007700';
@@ -81,13 +81,18 @@ function initParametrization (vnn)
     addColorToFolder (selection_colors, 'outbound_color',  'outbound');
     addColorToFolder (selection_colors, 'neighbour_color', 'neighbour');
 
-    gui.add (vnn.params, 'networkId', { SixLayers: CONST.NETWORK_0, OneLayer: CONST.NETWORK_1 }).name ('network type');
+    gui.add (vnn.params, 'networkId',
+    {
+        SixLayers: CONST.NETWORK_0,
+        OneLayer:  CONST.NETWORK_1,
+        Test:      CONST.NETWORK_2,
+    }).name ('network type');
     gui.add (vnn.params, 'networkRecreate').name ('recreate network');
     gui.add (vnn.params, 'stimulusId', { HelloWorld: CONST.STIMULUS_HELLO_WORLD }).name ('stimulus');
 
     var simulationControl = gui.add (vnn.params, 'simulationToggle').name ('start simulation');
 
-    gui.add (vnn.params, 'slowdown', vnn.params.slowdown / 2, vnn.params.slowdown * 10)
+    gui.add (vnn.params, 'slowdown', vnn.params.slowdown / 10, vnn.params.slowdown * 10)
         .onFinishChange (function (value) { vnn.setSlowdown (value); });
 
     gui.add (vnn.params, 'help');
