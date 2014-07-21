@@ -43,6 +43,7 @@ function Network (gl, vnn)
     var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0, radiatingSpikes = [];
     var heap = new MinBinaryHeap ();
 
+    var selInbound = [], selOutbound = [], selNeighbours = [], selInConnArray  = new Uint16Array (), selOutConnArray = new Uint16Array ();
 
     var nodeProgram       = initProgram (gl, 'node'),
         nodePickerProgram = initProgram (gl, 'nodePicker'),
@@ -50,9 +51,11 @@ function Network (gl, vnn)
         spikeProgram      = initProgram (gl, 'spike'),
         spikeLinesProgram = initProgram (gl, 'spikeLines');
 
-    var nodesBuffer = gl.createBuffer (),
-        edgesBuffer = gl.createBuffer (),
-        spikeBuffer = gl.createBuffer ();
+    var nodesBuffer   = gl.createBuffer (),
+        edgesBuffer   = gl.createBuffer (),
+        spikeBuffer   = gl.createBuffer (),
+        selInConnBuf  = gl.createBuffer (),
+        selOutConnBuf = gl.createBuffer ();
 
     nodeProgram.end_time   = gl.getAttribLocation (nodeProgram, 'end_time');
     nodeProgram.attributes = gl.getAttribLocation (nodeProgram, 'attributes');
@@ -135,12 +138,7 @@ function Network (gl, vnn)
         if (adjacencyList[i] === undefined) adjacencyList[i] = [];
     }
 
-    var selInbound = [], selOutbound = [], selNeighbours = [],
-        selInConnArray  = new Uint16Array (),
-        selOutConnArray = new Uint16Array (),
-        selInConnBuf  = gl.createBuffer (),
-        selOutConnBuf = gl.createBuffer (),
-        lastSelectedId = makeRef ();
+    var lastSelectedId = makeRef ();
 
     this.select = function (id)
     {
@@ -148,9 +146,13 @@ function Network (gl, vnn)
             function (id)
             {
                 vnn.selectNode (id);
+                var intColor = vecToInt (vnn.params.selected_color)
+                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = intColor;
+                lastHoverAttr = intColor;
             },
             function (id) // called when selection is cleared
             {
+                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
                 selInConnArray  = new Uint16Array ();
                 selOutConnArray = new Uint16Array ();
                 var clearAttrFun = function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = 0; nodesToUpdate.push (i); }
@@ -209,12 +211,21 @@ function Network (gl, vnn)
         }
     }
 
-    var lastHoverId = makeRef ();
+    var lastHoverId = makeRef (), lastHoverAttr;
     this.hover = function (id)
     {
         processSelection (lastHoverId, id,
-                          function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.hover_color); },
-                          function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = 0; });
+                          function (i)
+                          {
+                              var idx = i * NODE_SIZE + NODE_ATTR_OFFSET;
+                              lastHoverAttr = nodesArray[idx];
+                              nodesArray[idx] = vecToInt (vnn.params.hover_color);
+                          },
+                          function (i)
+                          {
+                              var idx = i * NODE_SIZE + NODE_ATTR_OFFSET;
+                              nodesArray[idx] = lastHoverAttr;
+                          });
     }
 
     this.connect = function (from, to)
@@ -551,15 +562,15 @@ function Network (gl, vnn)
     {
         if (id < MAX_ID)
         {
-            if (lastId == MAX_ID || lastId != id)
-            {
-                doSelection (id);
-                nodesToUpdate.push (id);
-            }
             if (lastId != MAX_ID && lastId != id)
             {
                 clearSelection (+lastId);
                 nodesToUpdate.push (+lastId);
+            }
+            if (lastId == MAX_ID || lastId != id)
+            {
+                doSelection (id);
+                nodesToUpdate.push (id);
             }
             lastId (id);
         }

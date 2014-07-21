@@ -25,6 +25,7 @@ function initParametrization (vnn)
         this.connection_color = toColor (this.connection_color_hex);
         this.spike_color      = toColor (this.spike_color_hex);
         this.hover_color      = toColor (this.hover_color_hex);
+        this.selected_color   = toColor (this.selected_color_hex);
         this.inbound_color    = toColor (this.inbound_color_hex);
         this.outbound_color   = toColor (this.outbound_color_hex);
         this.neighbour_color  = toColor (this.neighbour_color_hex);
@@ -77,6 +78,7 @@ function initParametrization (vnn)
     addColorToFolder (colors, 'hover_color',      'hover');
 
     var selection_colors = colors.addFolder ('selection');
+    addColorToFolder (selection_colors, 'selected_color',  'selected');
     addColorToFolder (selection_colors, 'inbound_color',   'inbound');
     addColorToFolder (selection_colors, 'outbound_color',  'outbound');
     addColorToFolder (selection_colors, 'neighbour_color', 'neighbour');
