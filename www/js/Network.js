@@ -70,9 +70,9 @@ function Network (gl, vnn)
 
     connectionProgram.end_time = gl.getAttribLocation (connectionProgram, 'end_time');
     connectionProgram.duration = gl.getAttribLocation (connectionProgram, 'duration');
-    connectionProgram.time        = gl.getUniformLocation (connectionProgram, 'time');
-    connectionProgram.spike_color = gl.getUniformLocation (connectionProgram, 'spike_color');
-    connectionProgram.rest_color  = gl.getUniformLocation (connectionProgram, 'rest_color');
+    connectionProgram.time             = gl.getUniformLocation (connectionProgram, 'time');
+    connectionProgram.spike_color      = gl.getUniformLocation (connectionProgram, 'spike_color');
+    connectionProgram.connection_color = gl.getUniformLocation (connectionProgram, 'connection_color');
 
     spikeProgram.end_position = gl.getAttribLocation (spikeProgram, 'end_position');
     spikeProgram.duration     = gl.getAttribLocation (spikeProgram, 'duration');
@@ -83,10 +83,10 @@ function Network (gl, vnn)
 
     spikeLinesProgram.duration = gl.getAttribLocation (spikeLinesProgram, 'duration');
     spikeLinesProgram.end_time = gl.getAttribLocation (spikeLinesProgram, 'end_time');
-    spikeLinesProgram.time        = gl.getUniformLocation (spikeLinesProgram, 'time');
-    spikeLinesProgram.attenuation = gl.getUniformLocation (spikeLinesProgram, 'attenuation');
-    spikeLinesProgram.rest_color  = gl.getUniformLocation (spikeLinesProgram, 'rest_color');
-    spikeLinesProgram.spike_color = gl.getUniformLocation (spikeLinesProgram, 'spike_color');
+    spikeLinesProgram.time             = gl.getUniformLocation (spikeLinesProgram, 'time');
+    spikeLinesProgram.attenuation      = gl.getUniformLocation (spikeLinesProgram, 'attenuation');
+    spikeLinesProgram.connection_color = gl.getUniformLocation (spikeLinesProgram, 'connection_color');
+    spikeLinesProgram.spike_color      = gl.getUniformLocation (spikeLinesProgram, 'spike_color');
 
     gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
     gl.bufferData (gl.ARRAY_BUFFER, nodesArray, gl.DYNAMIC_DRAW);
@@ -130,7 +130,7 @@ function Network (gl, vnn)
         nodesArray[i_start + NODE_POS_OFFSET + 1]  = y;
         nodesArray[i_start + NODE_POS_OFFSET + 2]  = z;
         nodesArray[i_start + NODE_ID_OFFSET]       = i;
-        nodesArray[i_start + NODE_END_TIME_OFFSET] = - vnn.params.absolute_refractory * vnn.params.slowdown;
+        nodesArray[i_start + NODE_END_TIME_OFFSET] = - attenuation ();
         nodesArray[i_start + NODE_ATTR_OFFSET]     = 0;
 
         nodesToUpdate.push (i);
@@ -308,8 +308,8 @@ function Network (gl, vnn)
     {
         useProgram (connectionProgram, pMatrix, mvMatrix);
 
-        gl.uniform3fv (connectionProgram.rest_color,  vnn.params.connection_color);
-        gl.uniform3fv (connectionProgram.spike_color, vnn.params.spike_color);
+        gl.uniform3fv (connectionProgram.connection_color, vnn.params.connection_color);
+        gl.uniform3fv (connectionProgram.spike_color,      vnn.params.spike_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
         gl.vertexAttribPointer (connectionProgram.position, POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
@@ -322,14 +322,14 @@ function Network (gl, vnn)
         // selected inbound/outbound
         if (selInConnArray.length)
         {
-            gl.uniform3fv (connectionProgram.rest_color, vnn.params.inbound_color);
+            gl.uniform3fv (connectionProgram.connection_color, vnn.params.inbound_color);
             gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selInConnBuf);
             gl.drawElements (gl.LINES, selInConnArray.length, gl.UNSIGNED_SHORT, 0);
         }
 
         if (selOutConnArray.length)
         {
-            gl.uniform3fv (connectionProgram.rest_color, vnn.params.outbound_color);
+            gl.uniform3fv (connectionProgram.connection_color, vnn.params.outbound_color);
             gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selOutConnBuf);
             gl.drawElements (gl.LINES, selOutConnArray.length, gl.UNSIGNED_SHORT, 0);
         }
@@ -337,29 +337,38 @@ function Network (gl, vnn)
 
     this.drawSpikes = function (pMatrix, mvMatrix, time) // draw spike propagation
     {
-        useProgram (spikeProgram, pMatrix, mvMatrix);
+        if (vnn.params.drawSpikeParticles)
+        {
+            useProgram (spikeProgram, pMatrix, mvMatrix);
 
-        gl.enableVertexAttribArray (spikeProgram.end_position);
-        gl.enableVertexAttribArray (spikeProgram.duration);
-        gl.enableVertexAttribArray (spikeProgram.end_time);
+            gl.enableVertexAttribArray (spikeProgram.end_position);
+            gl.enableVertexAttribArray (spikeProgram.duration);
+            gl.enableVertexAttribArray (spikeProgram.end_time);
 
-        gl.uniform1f (spikeProgram.time,        time);
-        gl.uniform1f (spikeProgram.attenuation, attenuation ());
-        gl.uniform3fv (spikeProgram.spike_color, vnn.params.spike_color);
+            gl.uniform1f (spikeProgram.time,        time);
+            gl.uniform1f (spikeProgram.attenuation, attenuation ());
+            gl.uniform3fv (spikeProgram.spike_color, vnn.params.spike_color);
 
-        gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
+            gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
-        clearExpiredSpikes (time);
-        updateSpikesArray ();
+            clearExpiredSpikes (time);
+            updateSpikesArray ();
 
-        gl.vertexAttribPointer (spikeProgram.position,     POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS_1_BYTE_OFFSET);
-        gl.vertexAttribPointer (spikeProgram.end_position, POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS_2_BYTE_OFFSET);
-        gl.vertexAttribPointer (spikeProgram.duration,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_DURATION_2_BYTE_OFFSET);
-        gl.vertexAttribPointer (spikeProgram.end_time,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_END_TIME_2_BYTE_OFFSET);
+            gl.vertexAttribPointer (spikeProgram.position,     POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS_1_BYTE_OFFSET);
+            gl.vertexAttribPointer (spikeProgram.end_position, POS_SIZE, gl.FLOAT, false, SPIKE_BYTES, SPIKE_POS_2_BYTE_OFFSET);
+            gl.vertexAttribPointer (spikeProgram.duration,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_DURATION_2_BYTE_OFFSET);
+            gl.vertexAttribPointer (spikeProgram.end_time,            1, gl.FLOAT, false, SPIKE_BYTES, SPIKE_END_TIME_2_BYTE_OFFSET);
 
-        gl.drawArrays (gl.POINTS, 0, numSpikes);
+            gl.drawArrays (gl.POINTS, 0, numSpikes);
+        }
+        else
+        {
+            gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 
-        // lines
+            clearExpiredSpikes (time);
+            updateSpikesArray ();
+        }
+
         useProgram (spikeLinesProgram, pMatrix, mvMatrix);
 
         gl.enableVertexAttribArray (spikeLinesProgram.duration);
@@ -367,8 +376,8 @@ function Network (gl, vnn)
 
         gl.uniform1f (spikeLinesProgram.time,        time);
         gl.uniform1f (spikeLinesProgram.attenuation, attenuation ());
-        gl.uniform3fv (spikeLinesProgram.spike_color, vnn.params.spike_color);
-        gl.uniform3fv (spikeLinesProgram.rest_color,  vnn.params.rest_color);
+        gl.uniform3fv (spikeLinesProgram.spike_color,      vnn.params.spike_color);
+        gl.uniform3fv (spikeLinesProgram.connection_color, vnn.params.connection_color);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, spikeBuffer);
 

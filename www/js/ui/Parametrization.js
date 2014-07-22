@@ -34,6 +34,8 @@ function initParametrization (vnn)
         this.spike_speed         = CONST.PARAM_SPIKE_SPEED;
         this.absolute_refractory = CONST.PARAM_ABSOLUTE_REFRACTORY;
 
+        this.drawSpikeParticles = false;
+
         this.networkId = 0;
 
         this.stimulusId = 0;
@@ -93,6 +95,7 @@ function initParametrization (vnn)
     gui.add (vnn.params, 'stimulusId', { HelloWorld: CONST.STIMULUS_HELLO_WORLD }).name ('stimulus');
 
     var simulationControl = gui.add (vnn.params, 'simulationToggle').name ('start simulation');
+    gui.add (vnn.params, 'drawSpikeParticles').name ('spike particles');
 
     gui.add (vnn.params, 'slowdown', vnn.params.slowdown / 10, vnn.params.slowdown * 10)
         .onFinishChange (function (value) { vnn.setSlowdown (value); });

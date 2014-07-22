@@ -6,7 +6,6 @@ uniform mat4 pMatrix;
 uniform float log_far_const;
 uniform float far;
 
-
 varying float depth;
 
 void main (void)

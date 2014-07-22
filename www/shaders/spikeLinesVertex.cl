@@ -10,7 +10,7 @@ uniform float far;
 uniform float time;
 uniform float attenuation;
 
-uniform vec3 rest_color;
+uniform vec3 connection_color;
 uniform vec3 spike_color;
 
 varying vec3 color;
@@ -28,11 +28,11 @@ void main (void)
     }
     if (0.0 < duration && time < spike_time)
     {
-        color = mix (spike_color, rest_color, (spike_time - time) / duration);
+        color = mix (spike_color, connection_color, (spike_time - time) / duration);
     }
     else
     {
-        color = mix (rest_color, spike_color, (end_time - time) / attenuation);
+        color = mix (connection_color, spike_color, (end_time - time) / attenuation);
     }
 
     gl_Position = pMatrix * mvMatrix * vec4 (position, 1.0);
