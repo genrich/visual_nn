@@ -1,4 +1,5 @@
 c_src/*.o
+compute_node/_build/
 deps/
 doc/
 ebin/
@@ -6,7 +7,7 @@ ebin/
 .rebar/
 log/
 priv/
-test/shader/bin/
+test/shader/_build/
 deps_plt
 report.log
 *.swp

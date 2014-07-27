@@ -9,7 +9,7 @@ using namespace std;
 vector<pair<setup, teardown>> tests ()
 {
     shader::spike_color = vec3 {1.0, 0.0, 0.0};
-    shader::rest_color  = vec3 {0.0, 1.0, 0.0};
+    shader::connection_color  = vec3 {0.0, 1.0, 0.0};
     shader::attenuation = 1.0;
 
     return {

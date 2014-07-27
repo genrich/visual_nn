@@ -10,7 +10,8 @@
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record (state, {last_id = 0 :: non_neg_integer ()}).
+-record (s, {last_id = 0  :: non_neg_integer (),
+             compute_node :: pid ()}).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -53,10 +54,11 @@ reset_id () ->
 %% Initializes the server with new Stimuli and Neurons
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec init ([]) -> {ok, #state{}}.
+-spec init ([]) -> {ok, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 init ([]) ->
-    {ok, #state{}}.
+    process_flag (trap_exit, true),
+    {ok, #s{}}.
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -65,14 +67,14 @@ init ([]) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_call(id, _From, State :: #state{}) ->
-    {reply, NewId :: non_neg_integer (), NewState :: #state{}}.
+-spec handle_call(id, _From, State :: #s{}) ->
+    {reply, NewId :: non_neg_integer (), NewState :: #s{}}.
 %%--------------------------------------------------------------------------------------------------
-handle_call (id, _From, #state{last_id = Id} = State) ->
-    {reply, Id, State#state{last_id = Id + 1}};
+handle_call (id, _From, #s{last_id = Id} = State) ->
+    {reply, Id, State#s{last_id = Id + 1}};
 
-handle_call (reset_id, _From, #state{} = State) ->
-    {reply, ok, State#state{last_id = 0}}.
+handle_call (reset_id, _From, #s{} = State) ->
+    {reply, ok, State#s{last_id = 0}}.
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -81,7 +83,7 @@ handle_call (reset_id, _From, #state{} = State) ->
 %% Handling cast messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_cast(_, #state{}) -> {noreply, #state{}}.
+-spec handle_cast(_, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 handle_cast (_, State) ->
     {noreply, State}.
@@ -97,8 +99,17 @@ handle_cast (_, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_info (_, #state{}) -> {noreply, #state{}}.
+-spec handle_info (_, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
+handle_info ({compute_node_started, Pid}, State) ->
+    lager:debug ("compute_node_started ~p", [Pid]),
+    link (Pid),
+    {noreply, State#s{compute_node = Pid}};
+
+handle_info({'EXIT', Pid, Reason}, State) when Pid =:= State#s.compute_node ->
+    lager:error ("compute_node unlinked Pid=~p Reason=~p", [Pid, Reason]),
+    {noreply, State#s{compute_node = undefined}};
+
 handle_info (_, State) ->
     {noreply, State}.
 
@@ -126,7 +137,7 @@ terminate (_Reason, _State) ->
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec code_change(OldVsn :: (term () | {down, term ()}), State :: term (), Extra :: term ()) ->
-    {ok, #state{}} |
+    {ok, #s{}} |
     {error, Reason :: term ()}.
 %%--------------------------------------------------------------------------------------------------
 code_change (_OldVsn, State, _Extra) ->
