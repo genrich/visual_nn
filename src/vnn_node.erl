@@ -6,6 +6,7 @@
 -module (vnn_node).
 
 -export ([create/2,
+          create/3,
           connect/2,
           start/1,
           stop/1,
@@ -13,7 +14,7 @@
           consider_neighbours/2,
           loop/1]).
 
--include ("vnn_const.hrl").
+-include ("defs.hrl").
 
 -type neighbours_list () :: [{Length :: float (), Node :: pid ()}].
 
@@ -36,6 +37,19 @@
 %%--------------------------------------------------------------------------------------------------
 create (Type, Position) ->
     Id = vnn_utils:id (),
+    vnn_event:notify_position (Id, Position),
+    vnn_network:register_node (Id, self ()),
+    vnn_node:loop (#s{id = Id, type = Type, position = Position}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Create node
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec create (Id :: non_neg_integer (), Type :: vnn_network:node_type (), Position :: vnn_network:position ()) -> no_return ().
+%%--------------------------------------------------------------------------------------------------
+create (Id, Type, Position) ->
     vnn_event:notify_position (Id, Position),
     vnn_network:register_node (Id, self ()),
     vnn_node:loop (#s{id = Id, type = Type, position = Position}).
@@ -126,19 +140,16 @@ loop (#s{id             = Id,
 
         start when Type == stimulus_active;
                    Type == stimulus_rest ->
-            [start (Node) || Node <- sets:to_list (Outbound)],
             spike_after (vnn_stimulus:next_spike (Type)),
             State#s{is_active = true};
 
         start when State#s.is_active == false ->
-            [start (Node) || Node <- sets:to_list (Outbound)],
             State#s{is_active = true};
 
         start ->
             State;
 
         stop when State#s.is_active ->
-            [stop (Node) || Node <- sets:to_list (Outbound)],
             State#s{is_active = false};
 
         stop ->

@@ -6,12 +6,17 @@
 #include <thread>
 #include <vector>
 #include <map>
+#include <random>
+#include <unordered_map>
 
 #include "erl_interface.h"
 
-#define VNN_UTILS "vnn_utils"
+#include "Network.hpp"
+
+#define VNN_CNODE "vnn_cnode"
 #define CNODE     "COMPUTE_NODE: "
 
+//--------------------------------------------------------------------------------------------------
 class BufferGuard
 {
 public:
@@ -19,9 +24,10 @@ public:
 
     explicit BufferGuard (ei_x_buff &x_) :x (x_) {}
     ~BufferGuard () { ei_x_free (&x); }
-    BufferGuard (BufferGuard const&) = delete;
+    BufferGuard (BufferGuard const&)            = delete;
     BufferGuard& operator= (BufferGuard const&) = delete;
 };
+
 //--------------------------------------------------------------------------------------------------
 class Connection
 {
@@ -30,6 +36,20 @@ public:
     int      fd;
     Connection (std::string connectTo, std::string nodeName, std::string erlangCookie);
     ~Connection ();
+    Connection (Connection const&)            = delete;
+    Connection& operator= (Connection const&) = delete;
+};
+
+#define NODE_TYPES \
+    X (stimulus),  \
+    X (neuron),    \
+    X (node)
+
+enum NodeType
+{
+    #define X(a) a
+    NODE_TYPES
+    #undef X
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -37,21 +57,25 @@ public:
 //--------------------------------------------------------------------------------------------------
 class NodeConnection
 {
-    Connection conn;
+    std::random_device rd;
+    std::mt19937 rnd {rd ()};
 
+    Connection conn;
     std::thread inboundThread;
-    std::thread outboundThread;
+
+    std::vector<float> nodes;
+    std::vector<NodeType> nodeTypes;
     
     void inbound ();
-    void outbound ();
     void linkToRemote ();
+    void createNetwork ();
+    void sendAddNode (int const id, std::string const type, float const x, float const y, float const z);
 public:
     NodeConnection (std::string connectTo, std::string nodeName, std::string erlangCookie);
     NodeConnection ();
     ~NodeConnection ();
     NodeConnection (NodeConnection const&)            = delete;
     NodeConnection& operator= (NodeConnection const&) = delete;
-    void shutdown ();
 };
 
 #endif // NODECONNECTION_H

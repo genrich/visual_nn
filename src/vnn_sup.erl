@@ -57,10 +57,8 @@ stop_network () ->
 %%--------------------------------------------------------------------------------------------------
 init ([]) ->
     RestartStrategy = {one_for_one, 3, 60},
-    Utils = {vnn_utils, {vnn_utils, start_link, []},
-             permanent, 2000, worker, [vnn_utils]},
-    EventManager = {vnn_event, {vnn_event, start_link, []},
-                    permanent, 2000, worker, [vnn_event]},
-    EmbeddedYaws = {vnn_yaws_sup, {vnn_yaws_sup, start_link, []},
-                    permanent, 2000, supervisor, [vnn_yaws_sup]},
-    {ok, {RestartStrategy, [Utils, EventManager, EmbeddedYaws]}}.
+    ComputeNode     = {vnn_cnode,    {vnn_cnode,    start_link, []}, permanent, 2000, worker,     [vnn_cnode]},
+    Utils           = {vnn_utils,    {vnn_utils,    start_link, []}, permanent, 2000, worker,     [vnn_utils]},
+    EventManager    = {vnn_event,    {vnn_event,    start_link, []}, permanent, 2000, worker,     [vnn_event]},
+    EmbeddedYaws    = {vnn_yaws_sup, {vnn_yaws_sup, start_link, []}, permanent, 2000, supervisor, [vnn_yaws_sup]},
+    {ok, {RestartStrategy, [ComputeNode, Utils, EventManager, EmbeddedYaws]}}.

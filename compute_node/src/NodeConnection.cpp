@@ -8,13 +8,36 @@
 
 using namespace std;
 
-namespace node { bool shutdown = false; }
+//--------------------------------------------------------------------------------------------------
+namespace std
+{
+    template<> struct hash<NodeType> {
+        std::size_t operator() (NodeType const& nodeType) const
+        {
+            return static_cast<std::size_t> (nodeType);
+        }
+    };
+}
 
+//--------------------------------------------------------------------------------------------------
+std::string const& to_string (NodeType const& nodeType)
+{
+    static std::unordered_map<NodeType, const std::string> const names =
+    {
+        #define X(n) {NodeType::n, std::string {#n}}
+        NODE_TYPES
+        #undef X
+    };
+    return names.at (nodeType);
+}
+
+//--------------------------------------------------------------------------------------------------
 string error_msg ()
 {
     return string (strerror (erl_errno)) + " (" + to_string (erl_errno) + ")";
 }
 
+//--------------------------------------------------------------------------------------------------
 string default_erlang_cookie ()
 {
     string userHome (getenv ("HOME"));
@@ -23,6 +46,7 @@ string default_erlang_cookie ()
     return cookie;
 }
 
+//--------------------------------------------------------------------------------------------------
 string localhost ()
 {
     char hostname[1024];
@@ -47,6 +71,7 @@ Connection::Connection (string connectTo, string nodeName, string erlangCookie)
         throw runtime_error ("connecting: " + error_msg ());
 }
 
+//--------------------------------------------------------------------------------------------------
 Connection::~Connection ()
 {
     shutdown (fd, SHUT_RDWR);
@@ -56,26 +81,22 @@ Connection::~Connection ()
 //--------------------------------------------------------------------------------------------------
 NodeConnection::NodeConnection (string connectTo, string nodeName, string erlangCookie):
     conn {connectTo, nodeName, erlangCookie},
-    inboundThread  {&NodeConnection::inbound,  this},
-    outboundThread {&NodeConnection::outbound, this}
+    inboundThread {&NodeConnection::inbound, this}
 {
 }
 
+//--------------------------------------------------------------------------------------------------
 NodeConnection::NodeConnection (): NodeConnection ("visual_nn@" + localhost (), "compute_node", default_erlang_cookie ())
 {
 }
 
+//--------------------------------------------------------------------------------------------------
 NodeConnection::~NodeConnection ()
 {
     inboundThread.join ();
-    outboundThread.join ();
 }
 
-void NodeConnection::shutdown ()
-{
-    node::shutdown = true;
-}
-
+//--------------------------------------------------------------------------------------------------
 void NodeConnection::inbound ()
 {
     int version, arity, type, byteLength, index = 0;
@@ -84,7 +105,9 @@ void NodeConnection::inbound ()
 
     try
     {
-        while (!node::shutdown)
+        linkToRemote ();
+
+        while (true)
         {
             x = {}; index = 0; BufferGuard b {x};
             erlang_msg msg;
@@ -95,6 +118,22 @@ void NodeConnection::inbound ()
             {
                 if (msg.msgtype == ERL_SEND)
                 {
+                    if (ei_decode_version (x.buff, &index, &version))
+                        throw runtime_error ("decoding version");
+
+                    ei_get_type (x.buff, &index, &type, &byteLength);
+                    if (type == ERL_ATOM_EXT)
+                    {
+                        if (ei_decode_atom (x.buff, &index, atom))
+                            throw runtime_error ("decode atom");
+
+                        string atomString {atom};
+
+                        if (atomString == "create_network")
+                        {
+                            createNetwork ();
+                        }
+                    }
                 }
                 else if (msg.msgtype == ERL_REG_SEND)
                 {
@@ -139,26 +178,9 @@ void NodeConnection::inbound ()
     {
         cout << CNODE << "SHUTDOWN ERROR: " << e.what () << endl;
     }
-    shutdown ();
 }
 
-void NodeConnection::outbound ()
-{
-    try
-    {
-        linkToRemote ();
-        while (!node::shutdown)
-        {
-            this_thread::sleep_for (chrono::seconds {1});
-        }
-    }
-    catch (runtime_error const& e)
-    {
-        cout << CNODE << "outbound error: " << e.what () << endl;
-    }
-    shutdown ();
-}
-
+//--------------------------------------------------------------------------------------------------
 void NodeConnection::linkToRemote ()
 {
     erlang_pid* selfPid = ei_self (&conn.ec);
@@ -170,6 +192,43 @@ void NodeConnection::linkToRemote ()
     ei_x_encode_tuple_header (&x, 2);
     ei_x_encode_atom (&x, "compute_node_started");
     ei_x_encode_pid (&x, selfPid);
-    if (ei_reg_send (&conn.ec, conn.fd, (char*) VNN_UTILS, x.buff, x.index) < 0)
+    if (ei_reg_send (&conn.ec, conn.fd, (char*) VNN_CNODE, x.buff, x.index) < 0)
+        throw runtime_error ("send error");
+}
+
+//--------------------------------------------------------------------------------------------------
+void NodeConnection::createNetwork ()
+{
+    double mean {0}, std {1};
+
+    normal_distribution<> normal (mean, std);
+
+    nodes.push_back (normal (rnd));
+    nodes.push_back (normal (rnd));
+    nodes.push_back (normal (rnd));
+
+    nodeTypes.push_back (neuron);
+
+    for (int i = 0; i < nodeTypes.size (); ++i)
+    {
+        sendAddNode (i, to_string (nodeTypes[i]), nodes[i*3], nodes[i*3 + 1], nodes[i*3 + 2]);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void NodeConnection::sendAddNode (int const id, string const type, float const x, float const y, float const z)
+{
+    ei_x_buff b; BufferGuard bg {b};
+    ei_x_new_with_version (&b);
+    ei_x_encode_tuple_header (&b, 2);
+    ei_x_encode_atom (&b, "add_node");
+    ei_x_encode_tuple_header (&b, 3);
+    ei_x_encode_long (&b, id);
+    ei_x_encode_atom (&b, type.c_str ());
+    ei_x_encode_tuple_header (&b, 3);
+    ei_x_encode_double (&b, x);
+    ei_x_encode_double (&b, y);
+    ei_x_encode_double (&b, z);
+    if (ei_reg_send (&conn.ec, conn.fd, (char*) VNN_CNODE, b.buff, b.index) < 0)
         throw runtime_error ("send error");
 }

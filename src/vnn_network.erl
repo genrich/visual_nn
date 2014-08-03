@@ -9,11 +9,12 @@
           stop/0,
           sim_start/0,
           sim_stop/0,
+          add_node/3,
           select_node/1,
           register_node/2,
           create_stimulus/5]).
 
--export_type([position/0, node_type/0]).
+-export_type ([position/0, node_type/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -25,8 +26,7 @@
 
 -include ("const.hrl").
 
--record (s, {nodes            :: [pid ()],
-             stimuli          :: [pid ()],
+-record (s, {nodes = []       :: [pid ()],
              id_to_node = #{} :: #{non_neg_integer () => pid ()}}).
 
 %%--------------------------------------------------------------------------------------------------
@@ -71,6 +71,17 @@ sim_start () ->
 %%--------------------------------------------------------------------------------------------------
 sim_stop () ->
     gen_server:cast (?MODULE, sim_stop).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Process node selection: notify all node neighbours and connections
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec add_node (Id :: non_neg_integer (), Type :: node_type (), Position :: position ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+add_node (Id, Type, Position) ->
+    gen_server:cast (?MODULE, {add_node, {Id, Type, Position}}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -139,7 +150,7 @@ init (?NETWORK_0) ->
 
     Nodes = Stimuli ++ Layers,
 
-    {ok, #s{stimuli = Stimuli, nodes = Nodes}};
+    {ok, #s{nodes = Nodes}};
 
 init (?NETWORK_1) ->
     lager:debug ("network init 1"),
@@ -158,7 +169,7 @@ init (?NETWORK_1) ->
 
     Nodes = Stimuli ++ Layer,
 
-    {ok, #s{stimuli = Stimuli, nodes = Nodes}};
+    {ok, #s{nodes = Nodes}};
 
 init (?NETWORK_2) ->
     lager:debug ("network init 2"),
@@ -168,12 +179,22 @@ init (?NETWORK_2) ->
 
     vnn_utils:reset_id (),
 
-    Stimulus = spawn (vnn_node, create, [stimulus_active, {0, -300.0, 0}]),
-    Node     = spawn (vnn_node, create, [neuron, {0, 300, 0}]),
+    Stimulus = spawn (vnn_node, create, [stimulus_active, {0, -300, 0}]),
+    Node     = spawn (vnn_node, create, [neuron,          {0,  300, 0}]),
 
     vnn_node:connect (Stimulus, Node),
 
-    {ok, #s{stimuli = [Stimulus], nodes = [Node]}}.
+    {ok, #s{nodes = [Node]}};
+
+init (?NETWORK_3) ->
+    lager:debug ("network init 3"),
+    process_flag (trap_exit, true),
+
+    vnn_event:notify_new_network (),
+
+    vnn_cnode:create_network (),
+
+    {ok, #s{nodes = []}}.
 
 %%--------------------------------------------------------------------------------------------------
 %% @private
@@ -181,13 +202,13 @@ init (?NETWORK_2) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #s{}) ->
-    {reply, Reply :: term(), NewState :: #s{}}                        |
-    {reply, Reply :: term(), NewState :: #s{}, timeout() | hibernate} |
-    {noreply, NewState :: #s{}}                                       |
-    {noreply, NewState :: #s{}, timeout() | hibernate}                |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #s{}}       |
-    {stop, Reason :: term(), NewState :: #s{}}.
+-spec handle_call (Request :: term (), From :: {pid (), Tag :: term ()}, State :: #s{}) ->
+    {reply, Reply :: term (), NewState :: #s{}}                         |
+    {reply, Reply :: term (), NewState :: #s{}, timeout () | hibernate} |
+    {noreply, NewState :: #s{}}                                         |
+    {noreply, NewState :: #s{}, timeout () | hibernate}                 |
+    {stop, Reason :: term (), Reply :: term (), NewState :: #s{}}       |
+    {stop, Reason :: term (), NewState :: #s{}}.
 %%--------------------------------------------------------------------------------------------------
 handle_call (_Request, _From, State) ->
     Reply = ok,
@@ -202,16 +223,19 @@ handle_call (_Request, _From, State) ->
 %%--------------------------------------------------------------------------------------------------
 -spec handle_cast (term (), #s{}) -> {noreply, #s{}} | {stop, normal, #s{}}.
 %%--------------------------------------------------------------------------------------------------
-handle_cast (sim_start, #s{stimuli = Stimuli} = State) ->
+handle_cast (sim_start, #s{nodes = Nodes} = State) ->
     lager:debug ("sim_start"),
-    [vnn_node:start (Stimulus) || Stimulus <- Stimuli],
-
+    [vnn_node:start (Node) || Node <- Nodes],
     {noreply, State};
 
-handle_cast (sim_stop, #s{stimuli = Stimuli} = State) ->
+handle_cast (sim_stop, #s{nodes = Nodes} = State) ->
     lager:debug ("sim_stop"),
-    [vnn_node:stop (Stimulus) || Stimulus <- Stimuli],
+    [vnn_node:stop (Node) || Node <- Nodes],
     {noreply, State};
+
+handle_cast ({add_node, {Id, Type, Position}}, #s{nodes = Nodes} = State) ->
+    Node = spawn (vnn_node, create, [Id, Type, Position]),
+    {noreply, State#s{nodes = [Node | Nodes]}};
 
 handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
     Node = maps:get (Id, IdToNode),

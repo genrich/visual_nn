@@ -90,6 +90,7 @@ function initParametrization (vnn)
         SixLayers: CONST.NETWORK_0,
         OneLayer:  CONST.NETWORK_1,
         Test:      CONST.NETWORK_2,
+        CNodeTest: CONST.NETWORK_3,
     }).name ('network type');
     gui.add (vnn.params, 'networkRecreate').name ('recreate network');
     gui.add (vnn.params, 'stimulusId', { HelloWorld: CONST.STIMULUS_HELLO_WORLD }).name ('stimulus');

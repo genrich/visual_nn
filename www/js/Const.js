@@ -28,4 +28,5 @@ var CONST =
     NETWORK_0: 0,
     NETWORK_1: 1,
     NETWORK_2: 2,
+    NETWORK_3: 3,
 }

@@ -1,16 +1,16 @@
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Utils module
+%% Compute node delegation module
 %% @end
 %%--------------------------------------------------------------------------------------------------
--module (vnn_utils).
+-module (vnn_cnode).
 
--export ([start_link/0, id/0, reset_id/0]).
+-export ([start_link/0, create_network/0]).
 
 -behaviour (gen_server).
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record (s, {last_id = 0  :: non_neg_integer ()}).
+-record (s, {compute_node :: pid ()}).
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -27,24 +27,13 @@ start_link () ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Generate new id
+%% Delegate network creation to the compute node
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec id () -> Id :: non_neg_integer ().
+-spec create_network () -> ok.
 %%--------------------------------------------------------------------------------------------------
-id () ->
-    gen_server:call (?MODULE, id).
-
-
-%%--------------------------------------------------------------------------------------------------
-%% @doc
-%% Generate new id
-%% @end
-%%--------------------------------------------------------------------------------------------------
--spec reset_id () -> ok.
-%%--------------------------------------------------------------------------------------------------
-reset_id () ->
-    gen_server:call (?MODULE, reset_id).
+create_network () ->
+    gen_server:cast (?MODULE, create_network).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -56,6 +45,7 @@ reset_id () ->
 -spec init ([]) -> {ok, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 init ([]) ->
+    process_flag (trap_exit, true),
     {ok, #s{}}.
 
 
@@ -65,14 +55,11 @@ init ([]) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec handle_call (id | reset_id, _, State :: #s{}) ->
-    {reply, NewId :: non_neg_integer () | ok, NewState :: #s{}}.
+-spec handle_call (_, _, #s{}) ->
+    {reply, ok, NewState :: #s{}}.
 %%--------------------------------------------------------------------------------------------------
-handle_call (id, _From, #s{last_id = Id} = State) ->
-    {reply, Id, State#s{last_id = Id + 1}};
-
-handle_call (reset_id, _From, #s{} = State) ->
-    {reply, ok, State#s{last_id = 0}}.
+handle_call (_, _, #s{} = State) ->
+    {reply, ok, State}.
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -83,6 +70,11 @@ handle_call (reset_id, _From, #s{} = State) ->
 %%--------------------------------------------------------------------------------------------------
 -spec handle_cast (_, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
+handle_cast (create_network, #s{compute_node = CNPid} = State) when CNPid =/= undefined ->
+    lager:debug ("create_network"),
+    CNPid ! create_network,
+    {noreply, State};
+
 handle_cast (_, State) ->
     {noreply, State}.
 
@@ -91,14 +83,23 @@ handle_cast (_, State) ->
 %% @private
 %% @doc
 %% Handling all non call/cast messages
-%%
-%% @spec handle_info (Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec handle_info (_, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
+handle_info ({compute_node_started, Pid}, State) ->
+    lager:debug ("compute_node_started ~p", [Pid]),
+    link (Pid),
+    {noreply, State#s{compute_node = Pid}};
+
+handle_info ({'EXIT', Pid, Reason}, State) when Pid =:= State#s.compute_node ->
+    lager:error ("compute_node unlinked Pid=~p Reason=~p", [Pid, Reason]),
+    {noreply, State#s{compute_node = undefined}};
+
+handle_info ({add_node, {Id, Type, Pos}}, State) ->
+    vnn_network:add_node (Id, Type, Pos),
+    {noreply, State};
+
 handle_info (_, State) ->
     {noreply, State}.
 
