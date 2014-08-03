@@ -11,8 +11,6 @@
 
 #include "erl_interface.h"
 
-#include "Network.hpp"
-
 #define VNN_CNODE "vnn_cnode"
 #define CNODE     "COMPUTE_NODE: "
 
