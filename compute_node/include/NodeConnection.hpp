@@ -6,10 +6,11 @@
 #include <thread>
 #include <vector>
 #include <map>
-#include <random>
 #include <unordered_map>
 
 #include "erl_interface.h"
+
+#include "Network.hpp"
 
 #define VNN_CNODE "vnn_cnode"
 #define CNODE     "COMPUTE_NODE: "
@@ -32,22 +33,11 @@ class Connection
 public:
     ei_cnode ec;
     int      fd;
+
     Connection (std::string connectTo, std::string nodeName, std::string erlangCookie);
     ~Connection ();
     Connection (Connection const&)            = delete;
     Connection& operator= (Connection const&) = delete;
-};
-
-#define NODE_TYPES \
-    X (stimulus),  \
-    X (neuron),    \
-    X (node)
-
-enum NodeType
-{
-    #define X(a) a
-    NODE_TYPES
-    #undef X
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -55,15 +45,10 @@ enum NodeType
 //--------------------------------------------------------------------------------------------------
 class NodeConnection
 {
-    std::random_device rd;
-    std::mt19937 rnd {rd ()};
-
-    Connection conn;
+    Connection  conn;
     std::thread inboundThread;
+    Network     network;
 
-    std::vector<float> nodes;
-    std::vector<NodeType> nodeTypes;
-    
     void inbound ();
     void linkToRemote ();
     void createNetwork ();

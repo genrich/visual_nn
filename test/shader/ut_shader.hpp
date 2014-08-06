@@ -287,6 +287,11 @@ vec4 operator* (mat4 m, vec4 a)
 }
 
 // Functions ---------------------------------------------------------------------------------------
+double mod (double const& x, double const& y)
+{
+    return fmod (x, y);
+}
+
 template <typename T>
 T mix (T const& x, T const& y, float a)
 {
@@ -306,7 +311,8 @@ float log (float v)
 // -------------------------------------------------------------------------------------------------
 namespace shader
 {
-vec4 gl_Position;
+vec4   gl_Position;
+double gl_PointSize;
 
 void main ();
 }

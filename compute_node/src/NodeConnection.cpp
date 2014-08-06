@@ -199,19 +199,12 @@ void NodeConnection::linkToRemote ()
 //--------------------------------------------------------------------------------------------------
 void NodeConnection::createNetwork ()
 {
-    double mean {0}, std {1};
+    network.createStimulus ();
+    network.createNetwork ();
 
-    normal_distribution<> normal (mean, std);
-
-    nodes.push_back (normal (rnd));
-    nodes.push_back (normal (rnd));
-    nodes.push_back (normal (rnd));
-
-    nodeTypes.push_back (neuron);
-
-    for (int i = 0; i < nodeTypes.size (); ++i)
+    for (int i = 0; i < network.nodeTypes.size (); ++i)
     {
-        sendAddNode (i, to_string (nodeTypes[i]), nodes[i*3], nodes[i*3 + 1], nodes[i*3 + 2]);
+        sendAddNode (i, to_string (network.nodeTypes[i]), network.nodes[i*3], network.nodes[i*3 + 1], network.nodes[i*3 + 2]);
     }
 }
 

@@ -11,7 +11,7 @@
           notify_inbound/1,
           notify_outbound/1,
           notify_neighbour/1,
-          notify_position/2,
+          notify_position/3,
           notify_connection/2,
           notify_spike/1,
           notify_new_network/0]).
@@ -87,10 +87,10 @@ notify_neighbour (Id) ->
 %% Notify node position
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec notify_position (non_neg_integer (), vnn_network:position ()) -> ok.
+-spec notify_position (non_neg_integer (), vnn_network:node_type (), vnn_network:position ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-notify_position (Id, Position) ->
-    gen_event:notify (?MODULE, {notify_position, Id, Position}).
+notify_position (Id, Type, Position) ->
+    gen_event:notify (?MODULE, {notify_position, Id, Type, Position}).
 
 
 %%--------------------------------------------------------------------------------------------------

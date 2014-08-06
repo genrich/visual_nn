@@ -59,8 +59,8 @@ create (String, Stride, Lines, Fun) ->
     {Pids, _} = 
         lists:mapfoldl (fun ($X, {I0, Strd, Strd}) -> I = I0+1, J = 0, {Fun (Stride, Lines, I, J, stimulus_active),  {I, J+1, Strd}};
                             ($X, {I,  J,    Strd}) ->                  {Fun (Stride, Lines, I, J, stimulus_active),  {I, J+1, Strd}};
-                            ($ , {I0, Strd, Strd}) -> I = I0+1, J = 0, {Fun (Stride, Lines, I, J, stimulus),         {I, J+1, Strd}};
-                            ($ , {I,  J,    Strd}) ->                  {Fun (Stride, Lines, I, J, stimulus),         {I, J+1, Strd}} end,
+                            ($ , {I0, Strd, Strd}) -> I = I0+1, J = 0, {Fun (Stride, Lines, I, J, stimulus_rest),    {I, J+1, Strd}};
+                            ($ , {I,  J,    Strd}) ->                  {Fun (Stride, Lines, I, J, stimulus_rest),    {I, J+1, Strd}} end,
                         {0, 0, Stride}, String),
     Pids.
 

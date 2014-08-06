@@ -86,9 +86,10 @@ function initViewport (vnn)
             break;
 
         case CONST.MSG_POSITION:
-            var id = new Uint32Array (buffer, 4, 1)[0];
-            var pos = new Float32Array (buffer, 8,  3);
-            network.set (id, pos[0], pos[1], pos[2]);
+            var id       = new Uint32Array (buffer, 4, 1)[0];
+            var nodeType = new Uint32Array (buffer, 8, 1)[0];
+            var pos = new Float32Array (buffer, 12,  3);
+            network.set (id, nodeType, pos[0], pos[1], pos[2]);
             break;
 
         case CONST.MSG_CONNECTION:

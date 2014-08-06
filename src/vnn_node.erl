@@ -37,7 +37,7 @@
 %%--------------------------------------------------------------------------------------------------
 create (Type, Position) ->
     Id = vnn_utils:id (),
-    vnn_event:notify_position (Id, Position),
+    vnn_event:notify_position (Id, Type, Position),
     vnn_network:register_node (Id, self ()),
     vnn_node:loop (#s{id = Id, type = Type, position = Position}).
 
@@ -50,7 +50,7 @@ create (Type, Position) ->
 -spec create (Id :: non_neg_integer (), Type :: vnn_network:node_type (), Position :: vnn_network:position ()) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
 create (Id, Type, Position) ->
-    vnn_event:notify_position (Id, Position),
+    vnn_event:notify_position (Id, Type, Position),
     vnn_network:register_node (Id, self ()),
     vnn_node:loop (#s{id = Id, type = Type, position = Position}).
 
@@ -232,6 +232,14 @@ spike_after (Time, Node) ->
 %%--------------------------------------------------------------------------------------------------
 -spec process_spike (#s{}) -> #s{}.
 %%--------------------------------------------------------------------------------------------------
+process_spike (#s{type           = node,
+                  id             = Id,
+                  node_to_length = NodeToLength,
+                  outbound       = Outbound}
+               = State) ->
+    propagate_spikes (Id, Outbound, NodeToLength),
+    State;
+
 process_spike (#s{type           = neuron,
                   id             = Id,
                   node_to_length = NodeToLength,

@@ -14,6 +14,11 @@
 -define (MSG_CONNECTION,         5).
 -define (MSG_NEW_NETWORK,        6).
 
+%% Node types
+-define (NODE_NODE,    0).
+-define (NODE_SYNAPSE, 1).
+-define (NODE_NEURON,  2).
+
 %% Params
 -define (PARAM_SLOWDOWN,            10000.0).    % times slower
 -define (PARAM_SPIKE_SPEED,         25000000.0). % microns/sec

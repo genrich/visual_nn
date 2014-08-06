@@ -114,7 +114,7 @@ function Network (gl, vnn)
         return vec3.fromValues (nodesArray[i_start], nodesArray[i_start + 1], nodesArray[i_start + 2]);
     }
 
-    this.set = function (i, x, y, z)
+    this.set = function (i, nodeType, x, y, z)
     {
         var i_start = i * NODE_SIZE;
 
@@ -131,7 +131,7 @@ function Network (gl, vnn)
         nodesArray[i_start + NODE_POS_OFFSET + 2]  = z;
         nodesArray[i_start + NODE_ID_OFFSET]       = i;
         nodesArray[i_start + NODE_END_TIME_OFFSET] = - attenuation ();
-        nodesArray[i_start + NODE_ATTR_OFFSET]     = 0;
+        nodesArray[i_start + NODE_ATTR_OFFSET]     = nodeTypeToInt (nodesArray[i_start + NODE_ATTR_OFFSET], nodeType);
 
         nodesToUpdate.push (i);
 
@@ -146,16 +146,23 @@ function Network (gl, vnn)
             function (id)
             {
                 vnn.selectNode (id);
-                var intColor = vecToInt (vnn.params.selected_color)
-                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = intColor;
-                lastHoverAttr = intColor;
+                var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
+                var attr = colorToAttr (nodesArray[idx], vnn.params.selected_color)
+                nodesArray[idx] = attr;
+                lastHoverAttr = attr;
             },
             function (id) // called when selection is cleared
             {
-                nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = 0;
+                var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
+                nodesArray[idx] = attrColorClear (nodesArray[idx]);
                 selInConnArray  = new Uint16Array ();
                 selOutConnArray = new Uint16Array ();
-                var clearAttrFun = function (i) { nodesArray[i * NODE_SIZE + NODE_ATTR_OFFSET] = 0; nodesToUpdate.push (i); }
+                var clearAttrFun = function (i)
+                {
+                    var idx = i * NODE_SIZE + NODE_ATTR_OFFSET;
+                    nodesArray[idx] = attrColorClear (nodesArray[idx]);
+                    nodesToUpdate.push (i);
+                }
                 selInbound.   forEach (clearAttrFun);
                 selOutbound.  forEach (clearAttrFun);
                 selNeighbours.forEach (clearAttrFun);
@@ -170,7 +177,8 @@ function Network (gl, vnn)
         if (lastSelectedId < MAX_ID)
         {
             selNeighbours.push (id);
-            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.neighbour_color);
+            var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
+            nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.neighbour_color);
             nodesToUpdate.push (id);
         }
     }
@@ -180,7 +188,8 @@ function Network (gl, vnn)
         if (lastSelectedId < MAX_ID)
         {
             selInbound.push (id);
-            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.inbound_color);
+            var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
+            nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.inbound_color);
             nodesToUpdate.push (id);
 
             var len = selInConnArray.length;
@@ -198,7 +207,8 @@ function Network (gl, vnn)
         if (lastSelectedId < MAX_ID)
         {
             selOutbound.push (id);
-            nodesArray[id * NODE_SIZE + NODE_ATTR_OFFSET] = vecToInt (vnn.params.outbound_color);
+            var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
+            nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.outbound_color);
             nodesToUpdate.push (id);
 
             var len = selOutConnArray.length;
@@ -219,7 +229,7 @@ function Network (gl, vnn)
                           {
                               var idx = i * NODE_SIZE + NODE_ATTR_OFFSET;
                               lastHoverAttr = nodesArray[idx];
-                              nodesArray[idx] = vecToInt (vnn.params.hover_color);
+                              nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.hover_color);
                           },
                           function (i)
                           {
@@ -443,9 +453,22 @@ function Network (gl, vnn)
         }
     }
 
-    function vecToInt (vec)
+    function colorToAttr (attr, vec)
     {
-        return (vec[0] * 255) + (vec[1] * 255) * 256 + (vec[2] * 255) * 65536;
+        return (vec[0] * 255) + (vec[1] * 255) * 256 + (vec[2] * 255) * 65536
+                + 16777216
+                + (Math.floor (attr / 33554432) % 4) * 33554432;
+    }
+
+    function attrColorClear (attr)
+    {
+        return Math.floor (attr / 33554432) * 33554432;
+    }
+
+
+    function nodeTypeToInt (attr, nodeType)
+    {
+        return attr % 33554432 + nodeType * 33554432;
     }
 
     function distance (i, j)

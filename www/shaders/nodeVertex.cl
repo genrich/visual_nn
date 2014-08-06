@@ -23,11 +23,15 @@ void main (void)
                             mod (floor (attributes / 256.0),   256.0) / 255.0,
                             mod (floor (attributes / 65536.0), 256.0) / 255.0);
 
+    float isCustomColor = mod (floor (attributes / 16777216.0), 2.0);
+
+    float nodeType = mod (floor (attributes / 33554432.0), 4.0);
+
     float end_time_with_attenuation = end_time + attenuation;
 
     if (end_time_with_attenuation < time)
     {
-        color = attributes == 0.0 ? rest_color : attr_color;
+        color = isCustomColor == 0.0 ? rest_color : attr_color;
     }
     else
     {
@@ -36,7 +40,7 @@ void main (void)
         float t2 = t * t;
         float spike_strength = t1 * t2;
 
-        color = attributes == 0.0 ? mix (rest_color, spike_color, spike_strength) : attr_color;
+        color = isCustomColor == 0.0 ? mix (rest_color, spike_color, spike_strength) : attr_color;
     }
 
     gl_Position = pMatrix * mvMatrix * vec4 (position, 1.0);
@@ -44,7 +48,18 @@ void main (void)
     float w = clamp (gl_Position.w, 0.0, far);
     depth = log (w * 0.01 + 1.0) / log_far_const;
 
-    gl_PointSize = point_size * (1.0 - depth);
+    if (nodeType == 0.0) // Node
+    {
+        gl_PointSize = 1.0;
+    }
+    else if (nodeType == 1.0) // Synapse
+    {
+        gl_PointSize = 0.25 * point_size * (1.0 - depth);
+    }
+    else if (nodeType == 2.0) // Neuron
+    {
+        gl_PointSize = point_size * (1.0 - depth);
+    }
 
     depth = depth * depth;
 }
