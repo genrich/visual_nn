@@ -6,8 +6,10 @@
 #define NODE_TYPES       \
     X (stimulus_active), \
     X (stimulus_rest),   \
-    X (neuron),          \
-    X (node)
+    X (soma),            \
+    X (synapse),         \
+    X (dendrite),        \
+    X (axon)
 
 enum NodeType
 {
@@ -21,15 +23,16 @@ class Network
     std::random_device rd;
     std::mt19937 rnd {rd ()};
 
-    int id = 0;
-    void addNode (NodeType const, float const x, float const y, float const z);
+    int addNode (int const somaId, NodeType const, float const x, float const y, float const z);
     void createNeuron ();
 
 public:
     std::vector<float>    nodes;
     std::vector<NodeType> nodeTypes;
+    std::vector<int>      nodeSomaIds;
 
     Network ();
+    void init ();
     void createStimulus ();
     void createNetwork ();
 };

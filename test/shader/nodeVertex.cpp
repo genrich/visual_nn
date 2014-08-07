@@ -12,14 +12,15 @@ vector<pair<setup, teardown>> tests ()
     shader::point_size = 10.0;
 
     return {
-    { // Node
+    { // Soma
         [] {
             shader::attributes = 33554432.0 * 0;
         },
         [] {
-            assert (shader::gl_PointSize == 1.0);
+            assert (shader::gl_PointSize == 10.0);
         }
     },
+
     { // Synapse
         [] {
             shader::attributes = 33554432.0 * 1;
@@ -28,12 +29,22 @@ vector<pair<setup, teardown>> tests ()
             assert (shader::gl_PointSize == 2.5);
         }
     },
-    { // Neuron
+
+    { // Dendrite
         [] {
             shader::attributes = 33554432.0 * 2;
         },
         [] {
-            assert (shader::gl_PointSize == 10.0);
+            assert (shader::gl_PointSize == 1.0);
+        }
+    },
+
+    { // Axon
+        [] {
+            shader::attributes = 33554432.0 * 3;
+        },
+        [] {
+            assert (shader::gl_PointSize == 1.0);
         }
     }};
 }

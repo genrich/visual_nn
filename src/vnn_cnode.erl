@@ -71,7 +71,7 @@ handle_call (_, _, #s{} = State) ->
 -spec handle_cast (_, #s{}) -> {noreply, #s{}}.
 %%--------------------------------------------------------------------------------------------------
 handle_cast (create_network, #s{compute_node = CNPid} = State) when CNPid =/= undefined ->
-    lager:debug ("create_network"),
+    lager:debug ("cnode create_network"),
     CNPid ! create_network,
     {noreply, State};
 
@@ -96,8 +96,8 @@ handle_info ({'EXIT', Pid, Reason}, State) when Pid =:= State#s.compute_node ->
     lager:error ("compute_node unlinked Pid=~p Reason=~p", [Pid, Reason]),
     {noreply, State#s{compute_node = undefined}};
 
-handle_info ({add_node, {Id, Type, Pos}}, State) ->
-    vnn_network:add_node (Id, Type, Pos),
+handle_info ({add_node, {Id, SomaId, Type, Pos}}, State) ->
+    vnn_network:add_node (Id, SomaId, Type, Pos),
     {noreply, State};
 
 handle_info (_, State) ->

@@ -15,9 +15,10 @@
 -define (MSG_NEW_NETWORK,        6).
 
 %% Node types
--define (NODE_NODE,    0).
--define (NODE_SYNAPSE, 1).
--define (NODE_NEURON,  2).
+-define (NODE_SOMA,     0).
+-define (NODE_SYNAPSE,  1).
+-define (NODE_DENDRITE, 2).
+-define (NODE_AXON,     3).
 
 %% Params
 -define (PARAM_SLOWDOWN,            10000.0).    % times slower

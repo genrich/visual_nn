@@ -9,10 +9,8 @@
           stop/0,
           sim_start/0,
           sim_stop/0,
-          add_node/3,
-          select_node/1,
-          register_node/2,
-          create_stimulus/5]).
+          add_node/4,
+          select_node/1]).
 
 -export_type ([position/0, node_type/0]).
 
@@ -20,7 +18,7 @@
 -export ([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -type position ()  :: {X :: number (), Y :: number (), Z :: number ()}.
--type node_type () :: stimulus_active | stimulus_rest | neuron | synapse | node.
+-type node_type () :: stimulus_active | stimulus_rest | soma | synapse | dendrite | axon.
 
 -include_lib ("lager/include/lager.hrl").
 
@@ -78,10 +76,10 @@ sim_stop () ->
 %% Process node selection: notify all node neighbours and connections
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec add_node (Id :: non_neg_integer (), Type :: node_type (), Position :: position ()) -> ok.
+-spec add_node (non_neg_integer (), non_neg_integer (), node_type (), position ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-add_node (Id, Type, Position) ->
-    gen_server:cast (?MODULE, {add_node, {Id, Type, Position}}).
+add_node (Id, SomaId, Type, Position) ->
+    gen_server:cast (?MODULE, {add_node, {Id, SomaId, Type, Position}}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -93,17 +91,6 @@ add_node (Id, Type, Position) ->
 %%--------------------------------------------------------------------------------------------------
 select_node (Id) ->
     gen_server:cast (?MODULE, {select_node, Id}).
-
-
-%%--------------------------------------------------------------------------------------------------
-%% @doc
-%% Register node id to pid mapping
-%% @end
-%%--------------------------------------------------------------------------------------------------
--spec register_node (non_neg_integer (), pid ()) -> ok.
-%%--------------------------------------------------------------------------------------------------
-register_node (Id, Node) ->
-    gen_server:cast (?MODULE, {register_node, Id, Node}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -122,13 +109,14 @@ init (?NETWORK_0) ->
 
     vnn_utils:reset_id (),
 
-    Stimuli = vnn_stimulus:create (),
-    Layer1 = create_layer (1, 100),
-    Layer2 = create_layer (2, 100),
-    Layer3 = create_layer (3, 100),
-    Layer4 = create_layer (4, 100),
-    Layer5 = create_layer (5, 100),
-    Layer6 = create_layer (6, 100),
+    State = #s{},
+    {Stimuli, State1} = create_stimulus (vnn_stimulus:hello_world (), State),
+    {Layer1,  State2} = create_layer (1, 100, State1),
+    {Layer2,  State3} = create_layer (2, 100, State2),
+    {Layer3,  State4} = create_layer (3, 100, State3),
+    {Layer4,  State5} = create_layer (4, 100, State4),
+    {Layer5,  State6} = create_layer (5, 100, State5),
+    {Layer6,  State7} = create_layer (6, 100, State6),
 
     [vnn_node:connect (Stimulus, Node4) || Stimulus <- Stimuli, Node4 <- Layer4, vnn_random:uniform () < 0.003],
     [vnn_node:connect (Stimulus, Node6) || Stimulus <- Stimuli, Node6 <- Layer6, vnn_random:uniform () < 0.0005],
@@ -148,9 +136,7 @@ init (?NETWORK_0) ->
     Layers = Layer1 ++ Layer2 ++ Layer3 ++ Layer4 ++ Layer5 ++ Layer6,
     neighbours (Layers),
 
-    Nodes = Stimuli ++ Layers,
-
-    {ok, #s{nodes = Nodes}};
+    {ok, State7};
 
 init (?NETWORK_1) ->
     lager:debug ("network init 1"),
@@ -160,16 +146,15 @@ init (?NETWORK_1) ->
 
     vnn_utils:reset_id (),
 
-    Stimuli = vnn_stimulus:create (),
-    Layer = create_layer (3, 100),
+    State = #s{},
+    {Stimuli, State1} = create_stimulus (vnn_stimulus:hello_world (), State),
+    {Layer, State2} = create_layer (3, 100, State1),
 
     [vnn_node:connect (Stimulus, Node1) || Stimulus <- Stimuli, Node1 <- Layer, vnn_random:uniform () < 0.005],
 
     neighbours (Layer),
 
-    Nodes = Stimuli ++ Layer,
-
-    {ok, #s{nodes = Nodes}};
+    {ok, State2};
 
 init (?NETWORK_2) ->
     lager:debug ("network init 2"),
@@ -179,12 +164,13 @@ init (?NETWORK_2) ->
 
     vnn_utils:reset_id (),
 
-    Stimulus = spawn (vnn_node, create, [stimulus_active, {0, -300, 0}]),
-    Node     = spawn (vnn_node, create, [neuron,          {0,  300, 0}]),
+    State = #s{},
+    {Stimulus, State1} = create_node (stimulus_active, {0, -300, 0}, State),
+    {Node,     State2} = create_node (soma,            {0,  300, 0}, State1),
 
     vnn_node:connect (Stimulus, Node),
 
-    {ok, #s{nodes = [Node]}};
+    {ok, State2};
 
 init (?NETWORK_3) ->
     lager:debug ("network init 3"),
@@ -194,7 +180,7 @@ init (?NETWORK_3) ->
 
     vnn_cnode:create_network (),
 
-    {ok, #s{nodes = []}}.
+    {ok, #s{}}.
 
 %%--------------------------------------------------------------------------------------------------
 %% @private
@@ -233,17 +219,20 @@ handle_cast (sim_stop, #s{nodes = Nodes} = State) ->
     [vnn_node:stop (Node) || Node <- Nodes],
     {noreply, State};
 
-handle_cast ({add_node, {Id, Type, Position}}, #s{nodes = Nodes} = State) ->
-    Node = spawn (vnn_node, create, [Id, Type, Position]),
+% soma, stimulus_active, stimulus_rest will send Id == SomaId
+handle_cast ({add_node, {Id, Id, Type, Position}}, State) ->
+    {_, NewState} = create_node (Id, Type, Position, State),
+    {noreply, NewState};
+
+handle_cast ({add_node, {Id, SomaId, Type, Position}}, #s{nodes = Nodes, id_to_node = IdToNode} = State) ->
+    Soma = maps:get (SomaId, IdToNode),
+    Node = vnn_node:create (Id, Soma, Type, Position),
     {noreply, State#s{nodes = [Node | Nodes]}};
 
 handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
     Node = maps:get (Id, IdToNode),
     vnn_node:notify_selected (Node),
     {noreply, State};
-
-handle_cast ({register_node, Id, Node}, #s{id_to_node = IdToNode} = State) ->
-    {noreply, State#s{id_to_node = maps:put (Id, Node, IdToNode)}};
 
 handle_cast (stop, State) ->
     {stop, normal, State}.
@@ -294,36 +283,71 @@ code_change (_OldVsn, State, _Extra) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec create_layer (LayerId :: non_neg_integer (), Count :: pos_integer ()) -> [pid ()].
+-spec create_layer (non_neg_integer (), pos_integer (), #s{}) -> {[pid ()], #s{}}.
 %%--------------------------------------------------------------------------------------------------
-create_layer (LayerId, Count) when Count > 0 ->
-    [create_neuron (LayerId) || _ <- lists:seq (1, Count)].
+create_layer (LayerId, Count, State) when Count > 0 ->
+    lists:mapfoldl (fun (_, S) -> create_neuron (LayerId, S) end, State, lists:seq (1, Count)).
 
 
 %%--------------------------------------------------------------------------------------------------
--spec create_neuron (LayerId :: pos_integer ()) -> pid ().
+-spec create_neuron (pos_integer (), #s{}) -> {pid (), #s{}}.
 %%--------------------------------------------------------------------------------------------------
-create_neuron (LayerId) ->
+create_neuron (LayerId, State) ->
     Position = {-140 + vnn_random:uniform (0.0, 280.0),
                  300 - ((LayerId - 1) * 100) + vnn_random:normal (0.0, 10.0),
                 -280 + vnn_random:uniform (0.0, 560.0)},
-    spawn (vnn_node, create, [neuron, Position]).
+    create_node (soma, Position, State).
 
 
 %%--------------------------------------------------------------------------------------------------
--spec create_stimulus (Stride, Lines, Row, Col, NodeType) -> pid () when
-      Stride   :: non_neg_integer (),
-      Lines    :: non_neg_integer (),
-      Row      :: non_neg_integer (),
-      Col      :: non_neg_integer (),
-      NodeType :: boolean ().
+-spec create_stimulus ({nonempty_string (), pos_integer (), pos_integer ()}, #s{}) -> {[pid ()], #s{}}.
 %%--------------------------------------------------------------------------------------------------
-create_stimulus (Stride, TotalLines, Row, Col, NodeType) ->
+create_stimulus ({String, Stride, Lines}, State) ->
+    {Pids, {_, _, _, NewState}} =
+    lists:mapfoldl (
+      fun ($X, {I0, Strd, Strd, S}) -> I = I0 + 1, J = 0,
+                                       {N, NewS} = create_stimulus (Stride, Lines, I, J, stimulus_active, S),
+                                       {N, {I, J + 1, Strd, NewS}};
+          ($X, {I,  J,    Strd, S}) -> {N, NewS} = create_stimulus (Stride, Lines, I, J, stimulus_active, S),
+                                       {N, {I, J + 1, Strd, NewS}};
+          ($ , {I0, Strd, Strd, S}) -> I = I0 + 1, J = 0,
+                                       {N, NewS} = create_stimulus (Stride, Lines, I, J, stimulus_rest, S),
+                                       {N, {I, J + 1, Strd, NewS}};
+          ($ , {I,  J,    Strd, S}) -> {N, NewS} = create_stimulus (Stride, Lines, I, J, stimulus_rest, S),
+                                       {N, {I, J + 1, Strd, NewS}} end,
+        {0, 0, Stride, State}, String),
+    {Pids, NewState}.
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec create_stimulus (non_neg_integer (),
+                       non_neg_integer (),
+                       non_neg_integer (),
+                       non_neg_integer (),
+                       node_type (),
+                       #s{}) -> {pid (), #s{}}.
+%%--------------------------------------------------------------------------------------------------
+create_stimulus (Stride, Lines, Row, Col, Type, State) ->
     Step = 14,
-    Position = {Row * Step - TotalLines * Step / 2 + Step / 2,
+    Position = {Row * Step - Lines * Step / 2 + Step / 2,
                 -300.0,
                 (Stride - 1 - Col) * Step - Stride * Step / 2 + Step / 2},
-    spawn (vnn_node, create, [NodeType, Position]).
+    create_node (Type, Position, State).
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec create_node (node_type (), position (), #s{}) -> {pid (), #s{}}.
+%%--------------------------------------------------------------------------------------------------
+create_node (Type, Position, State) ->
+    create_node (vnn_utils:id (), Type, Position, State).
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec create_node (non_neg_integer (), node_type (), position (), #s{}) -> {pid (), #s{}}.
+%%--------------------------------------------------------------------------------------------------
+create_node (Id, Type, Position, State) ->
+    Node = vnn_node:create (Id, Type, Position),
+    {Node, State#s{nodes = [Node | State#s.nodes], id_to_node = maps:put (Id, Node, State#s.id_to_node)}}.
 
 
 %%--------------------------------------------------------------------------------------------------

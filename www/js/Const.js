@@ -17,9 +17,10 @@ var CONST =
     MSG_NEW_NETWORK: 6,
 
     // Node types
-    NODE_NODE: 0,
+    NODE_SOMA: 0,
     NODE_SYNAPSE: 1,
-    NODE_NEURON: 2,
+    NODE_DENDRITE: 2,
+    NODE_AXON: 3,
 
     // Params
     PARAM_SLOWDOWN: 10000.0,

@@ -199,24 +199,28 @@ void NodeConnection::linkToRemote ()
 //--------------------------------------------------------------------------------------------------
 void NodeConnection::createNetwork ()
 {
+    network.init ();
     network.createStimulus ();
     network.createNetwork ();
 
     for (int i = 0; i < network.nodeTypes.size (); ++i)
     {
-        sendAddNode (i, to_string (network.nodeTypes[i]), network.nodes[i*3], network.nodes[i*3 + 1], network.nodes[i*3 + 2]);
+        sendAddNode (i, network.nodeSomaIds[i],
+                to_string (network.nodeTypes[i]),
+                network.nodes[i*3], network.nodes[i*3 + 1], network.nodes[i*3 + 2]);
     }
 }
 
 //--------------------------------------------------------------------------------------------------
-void NodeConnection::sendAddNode (int const id, string const type, float const x, float const y, float const z)
+void NodeConnection::sendAddNode (int const id, int const somaId, string const type, float const x, float const y, float const z)
 {
     ei_x_buff b; BufferGuard bg {b};
     ei_x_new_with_version (&b);
     ei_x_encode_tuple_header (&b, 2);
     ei_x_encode_atom (&b, "add_node");
-    ei_x_encode_tuple_header (&b, 3);
+    ei_x_encode_tuple_header (&b, 4);
     ei_x_encode_long (&b, id);
+    ei_x_encode_long (&b, somaId);
     ei_x_encode_atom (&b, type.c_str ());
     ei_x_encode_tuple_header (&b, 3);
     ei_x_encode_double (&b, x);

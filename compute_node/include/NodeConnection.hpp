@@ -52,7 +52,7 @@ class NodeConnection
     void inbound ();
     void linkToRemote ();
     void createNetwork ();
-    void sendAddNode (int const id, std::string const type, float const x, float const y, float const z);
+    void sendAddNode (int const id, int const somaId, std::string const type, float const x, float const y, float const z);
 public:
     NodeConnection (std::string connectTo, std::string nodeName, std::string erlangCookie);
     NodeConnection ();

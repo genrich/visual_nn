@@ -164,8 +164,9 @@ code_change (_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------------------------------------
 -spec type_to_const (vnn_network:node_type ()) -> non_neg_integer ().
 %%--------------------------------------------------------------------------------------------------
-type_to_const (stimulus_active) -> ?NODE_NEURON;
-type_to_const (stimulus_rest)   -> ?NODE_NEURON;
-type_to_const (neuron)          -> ?NODE_NEURON;
+type_to_const (stimulus_active) -> ?NODE_SOMA;
+type_to_const (stimulus_rest)   -> ?NODE_SOMA;
+type_to_const (soma)            -> ?NODE_SOMA;
 type_to_const (synapse)         -> ?NODE_SYNAPSE;
-type_to_const (node)            -> ?NODE_NODE.
+type_to_const (dendrite)        -> ?NODE_DENDRITE;
+type_to_const (axon)            -> ?NODE_AXON.

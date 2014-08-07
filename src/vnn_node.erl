@@ -5,8 +5,8 @@
 %%--------------------------------------------------------------------------------------------------
 -module (vnn_node).
 
--export ([create/2,
-          create/3,
+-export ([create/3,
+          create/4,
           connect/2,
           start/1,
           stop/1,
@@ -19,10 +19,12 @@
 -type neighbours_list () :: [{Length :: float (), Node :: pid ()}].
 
 -record (s, {id                       :: non_neg_integer (),
+             soma                     :: pid (),
              type                     :: vnn_network:node_type (),
              position                 :: vnn_network:position (),
              node_to_length = #{}     :: #{pid () => float ()},
              is_active = false        :: boolean (),
+             sub_nodes  = sets:new () :: sets:set (),
              inbound    = sets:new () :: sets:set (),
              outbound   = sets:new () :: sets:set (),
              neighbours = []          :: neighbours_list ()}).
@@ -33,13 +35,11 @@
 %% Create node
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec create (Type :: vnn_network:node_type (), Position :: vnn_network:position ()) -> no_return ().
+-spec create (non_neg_integer (), vnn_network:node_type (), vnn_network:position ()) -> pid ().
 %%--------------------------------------------------------------------------------------------------
-create (Type, Position) ->
-    Id = vnn_utils:id (),
+create (Id, Type, Position) ->
     vnn_event:notify_position (Id, Type, Position),
-    vnn_network:register_node (Id, self ()),
-    vnn_node:loop (#s{id = Id, type = Type, position = Position}).
+    spawn (vnn_node, loop, [#s{id = Id, type = Type, position = Position}]).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -47,12 +47,13 @@ create (Type, Position) ->
 %% Create node
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec create (Id :: non_neg_integer (), Type :: vnn_network:node_type (), Position :: vnn_network:position ()) -> no_return ().
+-spec create (non_neg_integer (), pid (), vnn_network:node_type (), vnn_network:position ()) -> pid ().
 %%--------------------------------------------------------------------------------------------------
-create (Id, Type, Position) ->
+create (Id, Soma, Type, Position) ->
     vnn_event:notify_position (Id, Type, Position),
-    vnn_network:register_node (Id, self ()),
-    vnn_node:loop (#s{id = Id, type = Type, position = Position}).
+    Node = spawn (vnn_node, loop, [#s{id = Id, soma = Soma, type = Type, position = Position}]),
+    Soma ! {add_sub_node, Node},
+    Node.
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -133,7 +134,8 @@ loop (#s{id             = Id,
     NewState =
     receive
         spike when State#s.is_active ->
-            process_spike (State);
+            process_spike (Type, Id, NodeToLength, Outbound),
+            State;
 
         spike ->
             State;
@@ -172,6 +174,9 @@ loop (#s{id             = Id,
         notify_neighbour ->
             vnn_event:notify_neighbour (Id),
             State;
+
+        {add_sub_node, Node} ->
+            State#s{sub_nodes = sets:add_element (Node, State#s.sub_nodes)};
 
         {connect_b, NodeB} ->
             NodeB ! {connect_a, self (), Position},
@@ -230,30 +235,19 @@ spike_after (Time, Node) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec process_spike (#s{}) -> #s{}.
+-spec process_spike (vnn_network:node_type (), non_neg_integer (), #{pid () => float ()}, sets:set ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-process_spike (#s{type           = node,
-                  id             = Id,
-                  node_to_length = NodeToLength,
-                  outbound       = Outbound}
-               = State) ->
-    propagate_spikes (Id, Outbound, NodeToLength),
-    State;
+process_spike (Type, Id, NodeToLength, Outbound) when Type =:= dendrite; Type =:= axon ->
+    propagate_spikes (Id, Outbound, NodeToLength);
 
-process_spike (#s{type           = neuron,
-                  id             = Id,
-                  node_to_length = NodeToLength,
-                  outbound       = Outbound}
-               = State) ->
+process_spike (Type, Id, NodeToLength, Outbound) when Type =:= soma; Type =:= synapse ->
     case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound, NodeToLength);
-                                        false -> undefined
-    end,
-    State;
+                                        false -> ok
+    end;
 
-process_spike (#s{id = Id, node_to_length = NodeToLength, outbound = Outbound} = State) ->
+process_spike (Type, Id, NodeToLength, Outbound) -> % Type is stimulus
     propagate_spikes (Id, Outbound, NodeToLength),
-    spike_after (vnn_stimulus:next_spike (State#s.type) + vnn_params:absolute_refractory ()),
-    State.
+    spike_after (vnn_stimulus:next_spike (Type) + vnn_params:absolute_refractory ()).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -317,8 +311,8 @@ node_test_ () ->
      [{"connection", ?_test
        (begin
             Position = {0, 0, 0},
-            Node1 = spawn (vnn_node, create, [neuron, Position]),
-            Node2 = spawn (vnn_node, create, [neuron, Position]),
+            Node1 = create (vnn_utils:id (), soma, Position),
+            Node2 = create (vnn_utils:id (), soma, Position),
             ?assert (is_process_alive (Node1)),
             ?assert (is_process_alive (Node2)),
 
@@ -336,7 +330,7 @@ node_test_ () ->
 
       {"neighbours", ?_test
        (begin
-            [Node | Nodes] = [spawn (vnn_node, create, [neuron, {NodeId - 1, 0, 0}]) || NodeId <- lists:seq (1, ?MAX_NEIGHBOURS + 1)],
+            [Node | Nodes] = [create (vnn_utils:id (), soma, {NodeId - 1, 0, 0}) || NodeId <- lists:seq (1, ?MAX_NEIGHBOURS + 1)],
             [consider_neighbours (Node, OtherNode) || OtherNode <- Nodes],
             timer:sleep (300),
 

@@ -48,17 +48,17 @@ void main (void)
     float w = clamp (gl_Position.w, 0.0, far);
     depth = log (w * 0.01 + 1.0) / log_far_const;
 
-    if (nodeType == 0.0) // Node
+    if (nodeType == 0.0) // Soma
     {
-        gl_PointSize = 1.0;
+        gl_PointSize = point_size * (1.0 - depth);
     }
     else if (nodeType == 1.0) // Synapse
     {
         gl_PointSize = 0.25 * point_size * (1.0 - depth);
     }
-    else if (nodeType == 2.0) // Neuron
+    else // Dendrite, Axon
     {
-        gl_PointSize = point_size * (1.0 - depth);
+        gl_PointSize = 1.0;
     }
 
     depth = depth * depth;
