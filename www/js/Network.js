@@ -65,7 +65,8 @@ function Network (gl, vnn)
     nodeProgram.spike_color = gl.getUniformLocation (nodeProgram, 'spike_color');
     nodeProgram.point_size  = gl.getUniformLocation (nodeProgram, 'point_size');
 
-    nodePickerProgram.id = gl.getAttribLocation (nodePickerProgram, 'id');
+    nodePickerProgram.id         = gl.getAttribLocation (nodePickerProgram, 'id');
+    nodePickerProgram.attributes = gl.getAttribLocation (nodePickerProgram, 'attributes');
     nodePickerProgram.point_size = gl.getUniformLocation (nodePickerProgram, 'point_size');
 
     connectionProgram.end_time = gl.getAttribLocation (connectionProgram, 'end_time');
@@ -402,13 +403,15 @@ function Network (gl, vnn)
     {
         useProgram (nodePickerProgram, pMatrix, mvMatrix);
         gl.enableVertexAttribArray (nodePickerProgram.id);
+        gl.enableVertexAttribArray (nodePickerProgram.attributes);
 
         gl.uniform1f (nodePickerProgram.point_size, vnn.params.point_size);
 
         gl.bindBuffer (gl.ARRAY_BUFFER, nodesBuffer);
 
-        gl.vertexAttribPointer (nodePickerProgram.position, POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
-        gl.vertexAttribPointer (nodePickerProgram.id,              1, gl.FLOAT, false, NODE_BYTES, NODE_ID_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodePickerProgram.position,   POS_SIZE, gl.FLOAT, false, NODE_BYTES, NODE_POS_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodePickerProgram.id,         1,        gl.FLOAT, false, NODE_BYTES, NODE_ID_BYTE_OFFSET);
+        gl.vertexAttribPointer (nodePickerProgram.attributes, 1,        gl.FLOAT, false, NODE_BYTES, NODE_ATTR_BYTE_OFFSET);
 
         gl.drawArrays (gl.POINTS, 0, numNodes);
     }

@@ -209,6 +209,11 @@ void NodeConnection::createNetwork ()
                 to_string (network.nodeTypes[i]),
                 network.nodes[i*3], network.nodes[i*3 + 1], network.nodes[i*3 + 2]);
     }
+
+    for (auto const& edge : network.connections)
+    {
+        sendAddConnection (edge.first, edge.second);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -226,6 +231,20 @@ void NodeConnection::sendAddNode (int const id, int const somaId, string const t
     ei_x_encode_double (&b, x);
     ei_x_encode_double (&b, y);
     ei_x_encode_double (&b, z);
+    if (ei_reg_send (&conn.ec, conn.fd, (char*) VNN_CNODE, b.buff, b.index) < 0)
+        throw runtime_error ("send error");
+}
+
+//--------------------------------------------------------------------------------------------------
+void NodeConnection::sendAddConnection (int const u, int const v)
+{
+    ei_x_buff b; BufferGuard bg {b};
+    ei_x_new_with_version (&b);
+    ei_x_encode_tuple_header (&b, 2);
+    ei_x_encode_atom (&b, "add_connection");
+    ei_x_encode_tuple_header (&b, 2);
+    ei_x_encode_long (&b, u);
+    ei_x_encode_long (&b, v);
     if (ei_reg_send (&conn.ec, conn.fd, (char*) VNN_CNODE, b.buff, b.index) < 0)
         throw runtime_error ("send error");
 }

@@ -10,6 +10,7 @@
           sim_start/0,
           sim_stop/0,
           add_node/4,
+          add_connection/2,
           select_node/1]).
 
 -export_type ([position/0, node_type/0]).
@@ -73,13 +74,24 @@ sim_stop () ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Process node selection: notify all node neighbours and connections
+%% Add node to the network
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec add_node (non_neg_integer (), non_neg_integer (), node_type (), position ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
 add_node (Id, SomaId, Type, Position) ->
     gen_server:cast (?MODULE, {add_node, {Id, SomaId, Type, Position}}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Add connection to the network
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec add_connection (non_neg_integer (), non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+add_connection (NodeAId, NodeBId) ->
+    gen_server:cast (?MODULE, {add_connection, {NodeAId, NodeBId}}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -220,14 +232,20 @@ handle_cast (sim_stop, #s{nodes = Nodes} = State) ->
     {noreply, State};
 
 % soma, stimulus_active, stimulus_rest will send Id == SomaId
-handle_cast ({add_node, {Id, Id, Type, Position}}, State) ->
-    {_, NewState} = create_node (Id, Type, Position, State),
-    {noreply, NewState};
+handle_cast ({add_node, {Id, Id, Type, Position}}, #s{nodes = Nodes, id_to_node = IdToNode} = State) ->
+    Node = vnn_node:create (Id, Type, Position),
+    {noreply, State#s{nodes = [Node | Nodes], id_to_node = maps:put (Id, Node, IdToNode)}};
 
 handle_cast ({add_node, {Id, SomaId, Type, Position}}, #s{nodes = Nodes, id_to_node = IdToNode} = State) ->
     Soma = maps:get (SomaId, IdToNode),
     Node = vnn_node:create (Id, Soma, Type, Position),
-    {noreply, State#s{nodes = [Node | Nodes]}};
+    {noreply, State#s{nodes = [Node | Nodes], id_to_node = maps:put (Id, Node, IdToNode)}};
+
+handle_cast ({add_connection, {NodeAId, NodeBId}}, #s{id_to_node = IdToNode} = State) ->
+    NodeA = maps:get (NodeAId, IdToNode),
+    NodeB = maps:get (NodeBId, IdToNode),
+    vnn_node:connect (NodeA, NodeB),
+    {noreply, State};
 
 handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
     Node = maps:get (Id, IdToNode),

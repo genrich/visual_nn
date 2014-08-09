@@ -100,6 +100,10 @@ handle_info ({add_node, {Id, SomaId, Type, Pos}}, State) ->
     vnn_network:add_node (Id, SomaId, Type, Pos),
     {noreply, State};
 
+handle_info ({add_connection, {NodeAId, NodeBId}}, State) ->
+    vnn_network:add_connection (NodeAId, NodeBId),
+    {noreply, State};
+
 handle_info (_, State) ->
     {noreply, State}.
 

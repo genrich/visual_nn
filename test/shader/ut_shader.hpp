@@ -1,3 +1,7 @@
+/**
+ * Unit test WebGL shader
+ */
+
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
