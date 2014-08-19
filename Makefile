@@ -9,14 +9,6 @@ EBINS        = $(PA_DEPS_EBIN) -pa ../visual_nn/ebin
 SHADER_TESTS = $(patsubst test/shader/%.cpp, test/shader/_build/%.test, $(wildcard test/shader/*.cpp))
 SHADER_DEPS  = $(patsubst %.test, %.d, $(SHADER_TESTS))
 
-CN_OBJ      = $(patsubst compute_node/src/%.cpp, compute_node/_build/%.o, $(wildcard compute_node/src/*.cpp))
-CN_DEPS     = $(patsubst %.o, %.d, $(CN_OBJ))
-CN_INC_DIRS = compute_node/include $(ERL_INTERFACE)/include
-CN_LIB_DIRS = $(ERL_INTERFACE)/lib
-CN_LIBS     = erl_interface ei
-CN_CXXFLAGS = -c -MMD -MP -std=c++1y -pthread -O2 -fdiagnostics-color=auto
-CN_LDFLAGS  = -pthread
-
 all: compile
 
 doc:
@@ -36,19 +28,11 @@ www/js/Const.js: include/const.hrl
 			END             { print "}" }'                                                                                 \
 	$^ > $@
 
-compile: deps/yaws www/js/Const.js compute_node/_build compute_node/_build/compute_node
+compute_node/_build/compute_node: compute_node/src/*.cpp compute_node/include/*.hpp
+	$(MAKE) -C compute_node compile
+
+compile: deps/yaws www/js/Const.js compute_node/_build/compute_node
 	@rebar skip_deps=true compile
-
-compute_node/_build:
-	mkdir -p $@
-
-compute_node/_build/%.o: compute_node/src/%.cpp
-	$(if $(ERL_INTERFACE), , $(eval ERL_INTERFACE := $(shell erl -noinput -eval 'io:format (code:lib_dir(erl_interface)).' -s init stop)))
-	$(CXX) $(CN_CXXFLAGS) -o $@ $< $(CN_INC_DIRS:%=-I%)
-
-compute_node/_build/compute_node: $(CN_OBJ)
-	$(if $(ERL_INTERFACE), , $(eval ERL_INTERFACE := $(shell erl -noinput -eval 'io:format (code:lib_dir(erl_interface)).' -s init stop)))
-	$(CXX) $(CN_LDFLAGS) -o $@ $^ $(CN_LIB_DIRS:%=-L%) $(CN_LIBS:%=-l%)
 
 report: deps/yaws
 	@sed -i 's/%% report,/report,/' rebar.config
@@ -58,11 +42,8 @@ report: deps/yaws
 shell: compile
 	erl $(EBINS)
 
-$(HOME)/.erlang.cookie:
-	erl -noinput -sname visual_nn -s init stop
-
-run_compute_node: compile $(HOME)/.erlang.cookie
-	./compute_node/_build/compute_node&
+run_compute_node: compile
+	$(MAKE) -C compute_node run
 
 run_visual_nn: compile
 	erl $(EBINS) -sname visual_nn -eval 'application:start (visual_nn).'
@@ -102,10 +83,11 @@ typer:
 
 clean:
 	rebar skip_deps=true clean
-	rm -rf compute_node/_build test/shader/_build
+	$(MAKE) -C compute_node clean
+	rm -rf test/shader/_build
 
 clean_all: clean
 	rm -f deps_plt README.html report.log
 	rm -rf ebin/ deps/ doc/ log/ priv/
 
--include $(SHADER_DEPS) $(CN_DEPS)
+-include $(SHADER_DEPS)
