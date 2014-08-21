@@ -3,16 +3,16 @@
 using namespace std;
 using namespace boost::numeric::ublas;
 
-constexpr float stimulusXstart = -200.0f;
-constexpr float stimulusXstep  =   20.0f;
-constexpr float stimulusZstart =  400.0f;
-constexpr float stimulusZstep  =  -20.0f;
-constexpr float stimulusY      = -300.0f;
+constexpr coord_type stimulusXstart = -200.0;
+constexpr coord_type stimulusXstep  =   20.0;
+constexpr coord_type stimulusZstart =  400.0;
+constexpr coord_type stimulusZstep  =  -20.0;
+constexpr coord_type stimulusY      = -300.0;
 
 constexpr int nodesPerNeuron = 1000;
 
-constexpr float neuronXmean =  0.0f;
-constexpr float neuronXstd  = 50.0f;
+constexpr coord_type neuronXmean =  0.0;
+constexpr coord_type neuronXstd  = 50.0;
 
 constexpr float factor = 0.9f;
 
@@ -90,7 +90,7 @@ findNearestPair (Matrix const&         distances,
                 int const              node,
                 coord_type const       factor)
 {
-    int        minIndex       = -1;
+    int        minIndex       = 0;
     coord_type minDistance    = numeric_limits<coord_type>::max ();
     auto const nodePathLength = nodeInfos[node].pathTroughNearest;
 
@@ -121,15 +121,17 @@ findNearestPair (Matrix const&         distances,
 void Network::createNeuron ()
 {
     normal_distribution<> normal {neuronXmean, neuronXstd};
-    lognormal_distribution<> logNormal {0, 0.5};
+    lognormal_distribution<> logNormal {0.0, 0.5};
 
     int somaId = nodes.size ();
 
     std::vector<NeuronNode> neuronNodes;
-    neuronNodes.push_back ({somaId, soma, Point {neuronXmean, stimulusY + 70, neuronXmean}});
+    neuronNodes.push_back ({somaId, soma, Point {neuronXmean, stimulusY + 70.0, neuronXmean}});
 
-    for (int i = 0; i < nodesPerNeuron; ++i)
-        neuronNodes.push_back ({somaId, dendrite, Point {normal (rnd), stimulusY + 100 * logNormal (rnd), normal (rnd)}});
+    for (int i = 1; i < nodesPerNeuron; ++i)
+        neuronNodes.push_back ({somaId, dendrite, Point {static_cast<coord_type> (normal (rnd)),
+                                                         static_cast<coord_type> (stimulusY + 100.0 * logNormal (rnd)),
+                                                         static_cast<coord_type> (normal (rnd))}});
 
     Matrix distances {nodesPerNeuron, nodesPerNeuron};
     initDistances (distances, neuronNodes);
@@ -141,7 +143,7 @@ void Network::createNeuron ()
 
     connections.push_back ({somaId + center, somaId + nearest});
 
-    for (int i = 1; i < nodesPerNeuron; ++i)
+    for (int i = 2; i < nodesPerNeuron; ++i)
     {
         tie (node, nearest) = findNearestPair (distances, nodeInfos, nearest, factor);
         connections.push_back ({somaId + node, somaId + nearest});
