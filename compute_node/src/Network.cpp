@@ -1,12 +1,7 @@
 #include "Network.hpp"
 
-#include <boost/graph/adjacency_matrix.hpp>
-#include <boost/graph/prim_minimum_spanning_tree.hpp>
-#include <boost/graph/kruskal_min_spanning_tree.hpp>
-#include <boost/graph/random_spanning_tree.hpp>
-
 using namespace std;
-using namespace boost;
+using namespace boost::numeric::ublas;
 
 constexpr float stimulusXstart = -200.0f;
 constexpr float stimulusXstep  =   20.0f;
@@ -19,12 +14,9 @@ constexpr int nodesPerNeuron = 1000;
 constexpr float neuronXmean =  0.0f;
 constexpr float neuronXstd  = 50.0f;
 
-using Graph            = adjacency_matrix<undirectedS, no_property, property<edge_weight_t, float>>;
-using VertexIterator   = boost::graph_traits<Graph>::vertex_iterator;
-using VertexDescriptor = graph_traits<Graph>::vertex_descriptor;
-using EdgeDescriptor   = graph_traits<Graph>::edge_descriptor;
+constexpr float factor = 0.9f;
 
-vector<vector<int>> const stimulusArray
+std::vector<std::vector<int>> const stimulusArray
 {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -49,64 +41,113 @@ vector<vector<int>> const stimulusArray
 };
 
 //--------------------------------------------------------------------------------------------------
-int Network::addNode (int const somaId, NodeType const type, float const x, float const y, float const z)
+void
+initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes)
 {
-    if (type == soma || type == stimulus_active || type == stimulus_rest)
-        nodeSomaIds.push_back (id);
-    else
-        nodeSomaIds.push_back (somaId);
+    for (int row = 0; row < distances.size1 (); ++row)
+    {
+        for (int col = 0; col < row; ++col)
+        {
+            auto const d = bg::distance (nodes[row].point, nodes[col].point);
+            distances (row, col) = d;
+            distances (col, row) = d;
+        }
+        distances (row, row) = 0;
+    }
+}
 
-    nodeTypes.push_back (type);
-    nodes.push_back (x);
-    nodes.push_back (y);
-    nodes.push_back (z);
+//--------------------------------------------------------------------------------------------------
+tuple<int, int>
+initNearestPair (Matrix const& distances, std::vector<NodeInfo>& nodeInfos)
+{
+    coord_type minDistance = numeric_limits<coord_type>::max ();
+    int minIndex = 0;
+    int constexpr centerNode = 0;
 
-    return id++;
+    nodeInfos[centerNode].isNotProcessed = 0;
+
+    for (int i = centerNode + 1; i < nodeInfos.size (); ++i)
+    {
+        nodeInfos[i].isNotProcessed      = 1;
+        nodeInfos[i].nearestNode         = centerNode;
+        nodeInfos[i].pathTroughNearest   = distances (centerNode, i);
+
+        if (nodeInfos[i].pathTroughNearest <= minDistance)
+        {
+            minDistance = nodeInfos[i].pathTroughNearest;
+            minIndex    = i;
+        }
+    }
+
+    nodeInfos[minIndex].isNotProcessed = 0;
+    return make_tuple (nodeInfos[minIndex].nearestNode, minIndex);
+}
+
+//--------------------------------------------------------------------------------------------------
+tuple<int, int>
+findNearestPair (Matrix const&         distances,
+                std::vector<NodeInfo>& nodeInfos,
+                int const              node,
+                coord_type const       factor)
+{
+    int        minIndex       = -1;
+    coord_type minDistance    = numeric_limits<coord_type>::max ();
+    auto const nodePathLength = nodeInfos[node].pathTroughNearest;
+
+    for (int i = 0; i < nodeInfos.size (); ++i)
+    {
+        if (nodeInfos[i].isNotProcessed)
+        {
+            auto const d = factor * distances (node, i) + nodePathLength;
+
+            if (d < nodeInfos[i].pathTroughNearest)
+            {
+                nodeInfos[i].nearestNode       = node;
+                nodeInfos[i].pathTroughNearest = distances (node, i) + nodePathLength;
+            }
+            if (d < minDistance)
+            {
+                minDistance = d;
+                minIndex    = i;
+            }
+        }
+    }
+
+    nodeInfos[minIndex].isNotProcessed = 0;
+    return make_tuple (nodeInfos[minIndex].nearestNode, minIndex);
 }
 
 //--------------------------------------------------------------------------------------------------
 void Network::createNeuron ()
 {
-    int baseId = id;
-
     normal_distribution<> normal {neuronXmean, neuronXstd};
     lognormal_distribution<> logNormal {0, 0.5};
 
-    int somaId = addNode (0, soma, neuronXmean, stimulusY + 70, neuronXmean);
+    int somaId = nodes.size ();
+
+    std::vector<NeuronNode> neuronNodes;
+    neuronNodes.push_back ({somaId, soma, Point {neuronXmean, stimulusY + 70, neuronXmean}});
 
     for (int i = 0; i < nodesPerNeuron; ++i)
+        neuronNodes.push_back ({somaId, dendrite, Point {normal (rnd), stimulusY + 100 * logNormal (rnd), normal (rnd)}});
+
+    Matrix distances {nodesPerNeuron, nodesPerNeuron};
+    initDistances (distances, neuronNodes);
+
+    std::vector<NodeInfo> nodeInfos (nodesPerNeuron);
+
+    int center, nearest, node;
+    tie (center, nearest) = initNearestPair (distances, nodeInfos);
+
+    connections.push_back ({somaId + center, somaId + nearest});
+
+    for (int i = 1; i < nodesPerNeuron; ++i)
     {
-        addNode (somaId, dendrite, normal (rnd), stimulusY + 100 * logNormal (rnd), normal (rnd));
+        tie (node, nearest) = findNearestPair (distances, nodeInfos, nearest, factor);
+        connections.push_back ({somaId + node, somaId + nearest});
     }
 
-    Graph g {nodesPerNeuron};
-    auto vmap = get (vertex_index, g);
-    VertexIterator src, end;
-    for (tie (src, end) = vertices (g); src != end; ++src)
-    {
-        for (VertexIterator dest {src + 1}; dest != end; ++dest)
-        {
-            auto const s = (baseId + vmap[*src])  * 3;
-            auto const d = (baseId + vmap[*dest]) * 3;
-            float weight = sqrt (pow (static_cast<double> (nodes[s + 0] - nodes[d + 0]), 2.0) + 
-                                 pow (static_cast<double> (nodes[s + 1] - nodes[d + 1]), 2.0) +
-                                 pow (static_cast<double> (nodes[s + 2] - nodes[d + 2]), 2.0));
-            EdgeDescriptor e; bool inserted;
-            tie (e, inserted) = add_edge (*src, *dest, weight, g);
-        }
-    }
-
-    vector<VertexDescriptor> p (num_vertices (g));
-
-    prim_minimum_spanning_tree (g, &p[0]);
-    // random_spanning_tree (g, rnd, predecessor_map (&p[0]));
-    for (int i = 1; i < p.size (); ++i)
-        connections.push_back ({baseId + vertex (i, g), baseId + p[i]});
-
-    // vector<EdgeDescriptor> tree;
-    // kruskal_minimum_spanning_tree (g, back_inserter (tree));
-    // for (auto const e : tree)
-    //     connections.push_back ({baseId + source (e, g), baseId + target (e, g)});
+    nodes.insert (nodes.end (), neuronNodes.begin (), neuronNodes.end ());
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -117,10 +158,8 @@ Network::Network ()
 //--------------------------------------------------------------------------------------------------
 void Network::init ()
 {
-    id = 0;
-    nodeSomaIds.clear ();
-    nodeTypes.clear ();
     nodes.clear ();
+    connections.clear ();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -128,10 +167,15 @@ void Network::createStimulus ()
 {
     for (int i = 0; i < stimulusArray.size (); ++i)
         for (int j = 0; j < stimulusArray[i].size (); ++j)
+        {
+            int const somaId = nodes.size ();
             if (stimulusArray[i][j])
-                addNode (0, stimulus_active, stimulusXstart + i * stimulusXstep, stimulusY, stimulusZstart + j * stimulusZstep);
+                nodes.push_back ({somaId, stimulus_active,
+                                  Point {stimulusXstart + i * stimulusXstep, stimulusY, stimulusZstart + j * stimulusZstep}});
             else
-                addNode (0, stimulus_rest,   stimulusXstart + i * stimulusXstep, stimulusY, stimulusZstart + j * stimulusZstep);
+                nodes.push_back ({somaId, stimulus_rest,
+                                  Point {stimulusXstart + i * stimulusXstep, stimulusY, stimulusZstart + j * stimulusZstep}});
+        }
 }
 
 //--------------------------------------------------------------------------------------------------

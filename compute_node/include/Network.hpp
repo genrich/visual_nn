@@ -2,6 +2,10 @@
 #define NETWORK_H
 
 #include <random>
+#include <tuple>
+
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/geometry/geometry.hpp>
 
 #define NODE_TYPES       \
     X (stimulus_active), \
@@ -18,20 +22,29 @@ enum NodeType
     #undef X
 };
 
+namespace bg = boost::geometry;
+namespace bu = boost::numeric::ublas;
+
+using coord_type = float;
+using Point      = bg::model::point<coord_type, 3, bg::cs::cartesian>;
+using Matrix     = bu::matrix<coord_type>;
+
+struct NeuronNode
+{
+    int      somaId;
+    NodeType type;
+    Point    point;
+};
+
 class Network
 {
     std::random_device rd;
-    std::mt19937 rnd {rd ()};
+    std::mt19937       rnd {rd ()};
 
-    int id = 0;
-
-    int addNode (int const somaId, NodeType const, float const x, float const y, float const z);
     void createNeuron ();
 
 public:
-    std::vector<float>               nodes;
-    std::vector<NodeType>            nodeTypes;
-    std::vector<int>                 nodeSomaIds;
+    std::vector<NeuronNode>          nodes;
     std::vector<std::pair<int, int>> connections;
 
     Network ();
@@ -39,5 +52,25 @@ public:
     void createStimulus ();
     void createNetwork ();
 };
+
+struct NodeInfo
+{
+    int        isNotProcessed;
+    int        nearestNode;
+    coord_type pathTroughNearest;
+};
+
+std::tuple<int, int>
+initNearestPair (Matrix const&         distances,
+                std::vector<NodeInfo>& nodeInfos);
+
+std::tuple<int, int>
+findNearestPair (Matrix const&         distances,
+                std::vector<NodeInfo>& nodeInfos,
+                int const              node,
+                coord_type const       factor);
+
+void
+initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes);
 
 #endif // NETWORK_H

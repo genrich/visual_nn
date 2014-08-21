@@ -203,11 +203,14 @@ void NodeConnection::createNetwork ()
     network.createStimulus ();
     network.createNetwork ();
 
-    for (int i = 0; i < network.nodeTypes.size (); ++i)
+    for (int i = 0; i < network.nodes.size (); ++i)
     {
-        sendAddNode (i, network.nodeSomaIds[i],
-                to_string (network.nodeTypes[i]),
-                network.nodes[i*3], network.nodes[i*3 + 1], network.nodes[i*3 + 2]);
+        sendAddNode (i,
+                                 network.nodes[i].somaId,
+                     to_string  (network.nodes[i].type),
+                     bg::get<0> (network.nodes[i].point),
+                     bg::get<1> (network.nodes[i].point),
+                     bg::get<2> (network.nodes[i].point));
     }
 
     for (auto const& edge : network.connections)
