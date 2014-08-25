@@ -60,16 +60,11 @@ struct NodeInfo
     coord_type pathTroughNearest;
 };
 
-std::tuple<int, int>
-initNearestPair (Matrix const&         distances,
-                std::vector<NodeInfo>& nodeInfos);
-
-std::tuple<int, int>
-findNearestPair (Matrix const&         distances,
-                std::vector<NodeInfo>& nodeInfos,
-                int const              node,
-                coord_type const       factor);
-
+std::pair<int, int>
+findNearest (Matrix const&         distances,
+            std::vector<NodeInfo>& nodeInfos,
+            int const              node,
+            coord_type const       factor);
 void
 initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes);
 

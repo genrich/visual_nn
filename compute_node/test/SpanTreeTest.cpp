@@ -8,32 +8,41 @@
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
-using namespace boost::numeric::ublas;
 
-BOOST_AUTO_TEST_CASE (FindNearestPairTest)
+BOOST_AUTO_TEST_CASE (FindNearestTest)
 {
+    coord_type constexpr factor = 0.8;
+    int constexpr somaNode = 0;
     std::vector<NeuronNode> nodes;
-    nodes.push_back ({0, soma,     Point {0, 0, 0}});
-    nodes.push_back ({0, dendrite, Point {1, 0, 0}});
-    nodes.push_back ({0, dendrite, Point {3, 0, 0}});
-    nodes.push_back ({0, dendrite, Point {6, 0, 0}});
+    nodes.push_back ({somaNode, soma,     Point {0, 0, 0}});
+    nodes.push_back ({somaNode, dendrite, Point {1, 0, 0}});
+    nodes.push_back ({somaNode, dendrite, Point {3, 0, 0}});
+    nodes.push_back ({somaNode, dendrite, Point {6, 0, 0}});
+    nodes.push_back ({somaNode, dendrite, Point {2, 2, 0}});
 
     Matrix distances {nodes.size (), nodes.size ()};
     initDistances (distances, nodes);
 
-    std::vector<NodeInfo> nodeInfos (nodes.size ());
-    int node1, node2; coord_type len;
-    tie (node1, node2) = initNearestPair (distances, nodeInfos);
-    BOOST_CHECK_EQUAL (node1, 0);
-    BOOST_CHECK_EQUAL (node2, 1);
+    std::vector<NodeInfo> nodeInfos (nodes.size (), {1, somaNode, numeric_limits<coord_type>::max ()});
+    nodeInfos[somaNode].isNotProcessed    = 0;
+    nodeInfos[somaNode].pathTroughNearest = 0;
 
-    tie (node1, node2) = findNearestPair (distances, nodeInfos, node2, 0.9);
-    BOOST_CHECK_EQUAL (node1, 1);
-    BOOST_CHECK_EQUAL (node2, 2);
+    int nearest, node;
+    tie (nearest, node) = findNearest (distances, nodeInfos, somaNode, factor);
+    BOOST_CHECK_EQUAL (nearest, 0);
+    BOOST_CHECK_EQUAL (node,    1);
 
-    tie (node1, node2) = findNearestPair (distances, nodeInfos, node2, 0.9);
-    BOOST_CHECK_EQUAL (node1, 2);
-    BOOST_CHECK_EQUAL (node2, 3);
+    tie (nearest, node) = findNearest (distances, nodeInfos, node, factor);
+    BOOST_CHECK_EQUAL (nearest, 1);
+    BOOST_CHECK_EQUAL (node,    2);
+
+    tie (nearest, node) = findNearest (distances, nodeInfos, node, factor);
+    BOOST_CHECK_EQUAL (nearest, 1);
+    BOOST_CHECK_EQUAL (node,    4);
+
+    tie (nearest, node) = findNearest (distances, nodeInfos, node, factor);
+    BOOST_CHECK_EQUAL (nearest, 2);
+    BOOST_CHECK_EQUAL (node,    3);
 }
 
 BOOST_AUTO_TEST_CASE (NetworkTest)

@@ -14,7 +14,7 @@ constexpr int nodesPerNeuron = 1000;
 constexpr coord_type neuronXmean =  0.0;
 constexpr coord_type neuronXstd  = 50.0;
 
-constexpr float factor = 0.9f;
+constexpr coord_type factor = 0.85;
 
 std::vector<std::vector<int>> const stimulusArray
 {
@@ -57,38 +57,11 @@ initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes)
 }
 
 //--------------------------------------------------------------------------------------------------
-tuple<int, int>
-initNearestPair (Matrix const& distances, std::vector<NodeInfo>& nodeInfos)
-{
-    coord_type minDistance = numeric_limits<coord_type>::max ();
-    int minIndex = 0;
-    int constexpr centerNode = 0;
-
-    nodeInfos[centerNode].isNotProcessed = 0;
-
-    for (int i = centerNode + 1; i < nodeInfos.size (); ++i)
-    {
-        nodeInfos[i].isNotProcessed      = 1;
-        nodeInfos[i].nearestNode         = centerNode;
-        nodeInfos[i].pathTroughNearest   = distances (centerNode, i);
-
-        if (nodeInfos[i].pathTroughNearest <= minDistance)
-        {
-            minDistance = nodeInfos[i].pathTroughNearest;
-            minIndex    = i;
-        }
-    }
-
-    nodeInfos[minIndex].isNotProcessed = 0;
-    return make_tuple (nodeInfos[minIndex].nearestNode, minIndex);
-}
-
-//--------------------------------------------------------------------------------------------------
-tuple<int, int>
-findNearestPair (Matrix const&         distances,
-                std::vector<NodeInfo>& nodeInfos,
-                int const              node,
-                coord_type const       factor)
+pair<int, int>
+findNearest (Matrix const&         distances,
+            std::vector<NodeInfo>& nodeInfos,
+            int const              node,
+            coord_type const       factor)
 {
     int        minIndex       = 0;
     coord_type minDistance    = numeric_limits<coord_type>::max ();
@@ -104,17 +77,26 @@ findNearestPair (Matrix const&         distances,
             {
                 nodeInfos[i].nearestNode       = node;
                 nodeInfos[i].pathTroughNearest = distances (node, i) + nodePathLength;
+
+                if (d < minDistance)
+                {
+                    minDistance = d;
+                    minIndex    = i;
+                }
             }
-            if (d < minDistance)
+            else
             {
-                minDistance = d;
-                minIndex    = i;
+                if (nodeInfos[i].pathTroughNearest < minDistance)
+                {
+                    minDistance = nodeInfos[i].pathTroughNearest;
+                    minIndex    = i;
+                }
             }
         }
     }
 
     nodeInfos[minIndex].isNotProcessed = 0;
-    return make_tuple (nodeInfos[minIndex].nearestNode, minIndex);
+    return make_pair (nodeInfos[minIndex].nearestNode, minIndex);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -136,16 +118,15 @@ void Network::createNeuron ()
     Matrix distances {nodesPerNeuron, nodesPerNeuron};
     initDistances (distances, neuronNodes);
 
-    std::vector<NodeInfo> nodeInfos (nodesPerNeuron);
+    int constexpr somaNode = 0;
+    std::vector<NodeInfo> nodeInfos (nodesPerNeuron, {1, somaNode, numeric_limits<coord_type>::max ()});
+    nodeInfos[somaNode].isNotProcessed    = 0;
+    nodeInfos[somaNode].pathTroughNearest = 0;
 
-    int center, nearest, node;
-    tie (center, nearest) = initNearestPair (distances, nodeInfos);
-
-    connections.push_back ({somaId + center, somaId + nearest});
-
-    for (int i = 2; i < nodesPerNeuron; ++i)
+    int node = somaNode, nearest;
+    for (int i = 0; i < nodesPerNeuron - 1; ++i)
     {
-        tie (node, nearest) = findNearestPair (distances, nodeInfos, nearest, factor);
+        tie (nearest, node) = findNearest (distances, nodeInfos, node, factor);
         connections.push_back ({somaId + node, somaId + nearest});
     }
 
