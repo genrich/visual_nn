@@ -10,24 +10,12 @@
 
 #include "erl_interface.h"
 
-#include "Network.hpp"
-
 #define VNN_CNODE "vnn_cnode"
 #define CNODE     "COMPUTE_NODE: "
 
-//--------------------------------------------------------------------------------------------------
-class BufferGuard
-{
-public:
-    ei_x_buff& x;
-
-    explicit BufferGuard (ei_x_buff &x_) :x (x_) {}
-    ~BufferGuard () { ei_x_free (&x); }
-    BufferGuard (BufferGuard const&)            = delete;
-    BufferGuard& operator= (BufferGuard const&) = delete;
-};
-
-//--------------------------------------------------------------------------------------------------
+/**
+ * Transport to the erlang node
+ */
 class Connection
 {
 public:
@@ -40,14 +28,13 @@ public:
     Connection& operator= (Connection const&) = delete;
 };
 
-//--------------------------------------------------------------------------------------------------
-// Represents connection to the erlang node.
-//--------------------------------------------------------------------------------------------------
+/**
+ * Connection to the erlang node handler.
+ */
 class NodeConnection
 {
     Connection  conn;
     std::thread inboundThread;
-    Network     network;
 
     void inbound ();
     void linkToRemote ();

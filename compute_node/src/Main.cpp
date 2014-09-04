@@ -14,7 +14,7 @@ int main (int argc, char* argv[])
 
     try
     {
-        this_thread::sleep_for (chrono::seconds {1});
+        this_thread::sleep_for (1s);
 
         NodeConnection node;
     }

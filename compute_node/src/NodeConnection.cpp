@@ -5,8 +5,21 @@
 #include <unistd.h>
 
 #include "NodeConnection.hpp"
+#include "Network.hpp"
 
 using namespace std;
+
+//--------------------------------------------------------------------------------------------------
+class BufferGuard
+{
+public:
+    ei_x_buff& x;
+
+    explicit BufferGuard (ei_x_buff &x_) :x (x_) {}
+    ~BufferGuard () { ei_x_free (&x); }
+    BufferGuard (BufferGuard const&)            = delete;
+    BufferGuard& operator= (BufferGuard const&) = delete;
+};
 
 //--------------------------------------------------------------------------------------------------
 namespace std
@@ -199,24 +212,19 @@ void NodeConnection::linkToRemote ()
 //--------------------------------------------------------------------------------------------------
 void NodeConnection::createNetwork ()
 {
-    network.init ();
-    network.createStimulus ();
-    network.createNetwork ();
+    Network network {StimulusLayer {BoundingBox {Point {-200, -300, 400}, Point {200, -300, -400}}, stimulusActivityMap},
+                     UniformLayer  {BoundingBox {Point {-200, -100, 400}, Point {200,  100, -400}}, NeuronCount {30}}};
 
-    for (int i = 0; i < network.nodes.size (); ++i)
+    int i = 0;
+    for_each (network.nodes.cbegin (), network.nodes.cend (), [&] (NeuronNode const& n)
     {
-        sendAddNode (i,
-                                 network.nodes[i].somaId,
-                     to_string  (network.nodes[i].type),
-                     bg::get<0> (network.nodes[i].point),
-                     bg::get<1> (network.nodes[i].point),
-                     bg::get<2> (network.nodes[i].point));
-    }
+        sendAddNode (i++, n.somaId, to_string (n.type), bg::get<0> (n.point), bg::get<1> (n.point), bg::get<2> (n.point));
+    });
 
-    for (auto const& edge : network.connections)
+    for_each (network.connections.cbegin (), network.connections.cend (), [=] (pair<int, int> const& edge)
     {
         sendAddConnection (edge.first, edge.second);
-    }
+    });
 }
 
 //--------------------------------------------------------------------------------------------------

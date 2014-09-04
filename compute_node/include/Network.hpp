@@ -1,11 +1,10 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-#include <random>
 #include <tuple>
 
 #include <boost/numeric/ublas/matrix.hpp>
-#include <boost/geometry/geometry.hpp>
+#include <boost/geometry.hpp>
 
 #define NODE_TYPES       \
     X (stimulus_active), \
@@ -23,11 +22,14 @@ enum NodeType
 };
 
 namespace bg = boost::geometry;
-namespace bu = boost::numeric::ublas;
+namespace bn = boost::numeric::ublas;
 
-using coord_type = float;
-using Point      = bg::model::point<coord_type, 3, bg::cs::cartesian>;
-using Matrix     = bu::matrix<coord_type>;
+using Coord       = float;
+using Point       = bg::model::point<Coord, 3, bg::cs::cartesian>;
+using BoundingBox = bg::model::box<Point>;
+using Matrix      = bn::matrix<Coord>;
+using NeuronCount = int;
+using ActivityMap = std::vector<std::vector<int>>;
 
 struct NeuronNode
 {
@@ -36,35 +38,50 @@ struct NeuronNode
     Point    point;
 };
 
-class Network
+extern ActivityMap const stimulusActivityMap;
+
+class StimulusLayer
 {
-    std::random_device rd;
-    std::mt19937       rnd {rd ()};
-
-    void createNeuron ();
-
 public:
     std::vector<NeuronNode>          nodes;
     std::vector<std::pair<int, int>> connections;
 
-    Network ();
-    void init ();
-    void createStimulus ();
-    void createNetwork ();
+    StimulusLayer (BoundingBox const& box, ActivityMap const& activityMap);
+};
+
+class UniformLayer
+{
+    void createNeuron (Point const& center);
+public:
+    std::vector<NeuronNode>          nodes;
+    std::vector<std::pair<int, int>> connections;
+
+    UniformLayer (BoundingBox const& box, int const neuronCount);
+};
+
+class Network
+{
+public:
+    std::vector<NeuronNode>          nodes;
+    std::vector<std::pair<int, int>> connections;
+
+    template <typename... Args> explicit Network (Args&&... args) { [] (auto...) {} ((add (std::forward<Args> (args)), 1)...); }
+    void add (StimulusLayer const& layer);
+    void add (UniformLayer const& layer);
 };
 
 struct NodeInfo
 {
-    int        isNotProcessed;
-    int        nearestNode;
-    coord_type pathTroughNearest;
+    int   isNotProcessed;
+    int   nearestNode;
+    Coord pathTroughNearest;
 };
 
 std::pair<int, int>
 findNearest (Matrix const&         distances,
             std::vector<NodeInfo>& nodeInfos,
             int const              node,
-            coord_type const       factor);
+            Coord const            factor);
 void
 initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes);
 

@@ -11,7 +11,7 @@ using namespace std;
 
 BOOST_AUTO_TEST_CASE (FindNearestTest)
 {
-    coord_type constexpr factor = 0.8;
+    Coord constexpr factor = 0.8;
     int constexpr somaNode = 0;
     std::vector<NeuronNode> nodes;
     nodes.push_back ({somaNode, soma,     Point {0, 0, 0}});
@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE (FindNearestTest)
     Matrix distances {nodes.size (), nodes.size ()};
     initDistances (distances, nodes);
 
-    std::vector<NodeInfo> nodeInfos (nodes.size (), {1, somaNode, numeric_limits<coord_type>::max ()});
+    std::vector<NodeInfo> nodeInfos (nodes.size (), {1, somaNode, numeric_limits<Coord>::max ()});
     nodeInfos[somaNode].isNotProcessed    = 0;
     nodeInfos[somaNode].pathTroughNearest = 0;
 
@@ -43,15 +43,4 @@ BOOST_AUTO_TEST_CASE (FindNearestTest)
     tie (nearest, node) = findNearest (distances, nodeInfos, node, factor);
     BOOST_CHECK_EQUAL (nearest, 2);
     BOOST_CHECK_EQUAL (node,    3);
-}
-
-BOOST_AUTO_TEST_CASE (NetworkTest)
-{
-    Network network;
-
-    network.init ();
-    network.createStimulus ();
-    network.createNetwork ();
-
-    BOOST_CHECK (true);
 }
