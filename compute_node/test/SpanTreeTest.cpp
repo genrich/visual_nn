@@ -2,7 +2,7 @@
 
 #include "Network.hpp"
 
-#define BOOST_TEST_MODULE SpanTreeTest
+#define BOOST_TEST_NO_MAIN SpanTreeTest
 
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
@@ -14,11 +14,11 @@ BOOST_AUTO_TEST_CASE (FindNearestTest)
     Coord constexpr factor = 0.8;
     int constexpr somaNode = 0;
     std::vector<NeuronNode> nodes;
-    nodes.push_back ({somaNode, soma,     Point {0, 0, 0}});
-    nodes.push_back ({somaNode, dendrite, Point {1, 0, 0}});
-    nodes.push_back ({somaNode, dendrite, Point {3, 0, 0}});
-    nodes.push_back ({somaNode, dendrite, Point {6, 0, 0}});
-    nodes.push_back ({somaNode, dendrite, Point {2, 2, 0}});
+    nodes.push_back ({Point {0, 0, 0}, somaNode, NodeType::soma});
+    nodes.push_back ({Point {1, 0, 0}, somaNode, NodeType::dendrite});
+    nodes.push_back ({Point {3, 0, 0}, somaNode, NodeType::dendrite});
+    nodes.push_back ({Point {6, 0, 0}, somaNode, NodeType::dendrite});
+    nodes.push_back ({Point {2, 2, 0}, somaNode, NodeType::dendrite});
 
     Matrix distances {nodes.size (), nodes.size ()};
     initDistances (distances, nodes);

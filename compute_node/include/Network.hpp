@@ -7,14 +7,13 @@
 #include <boost/geometry.hpp>
 
 #define NODE_TYPES       \
-    X (stimulus_active), \
-    X (stimulus_rest),   \
-    X (soma),            \
-    X (synapse),         \
     X (dendrite),        \
-    X (axon)
+    X (axon),            \
+    X (soma),            \
+    X (stimulus_active), \
+    X (stimulus_rest)
 
-enum NodeType
+enum class NodeType
 {
     #define X(a) a
     NODE_TYPES
@@ -28,14 +27,14 @@ using Coord       = float;
 using Point       = bg::model::point<Coord, 3, bg::cs::cartesian>;
 using BoundingBox = bg::model::box<Point>;
 using Matrix      = bn::matrix<Coord>;
-using NeuronCount = int;
+using NeuronCount = size_t;
 using ActivityMap = std::vector<std::vector<int>>;
 
 struct NeuronNode
 {
-    int      somaId;
-    NodeType type;
     Point    point;
+    size_t   somaId;
+    NodeType type;
 };
 
 extern ActivityMap const stimulusActivityMap;
@@ -43,46 +42,78 @@ extern ActivityMap const stimulusActivityMap;
 class StimulusLayer
 {
 public:
-    std::vector<NeuronNode>          nodes;
-    std::vector<std::pair<int, int>> connections;
+    std::vector<NeuronNode>                nodes;
+    std::vector<std::pair<size_t, size_t>> connections;
 
     StimulusLayer (BoundingBox const& box, ActivityMap const& activityMap);
 };
 
 class UniformLayer
 {
-    void createNeuron (Point const& center);
+    struct ArborParams
+    {
+        size_t   nodesCount;
+        NodeType nodeType;
+        Coord    std;
+        Coord    bias;
+    };
+    ArborParams const dendriticParams {100, NodeType::dendrite, 50};
+    ArborParams const axonalParams    {100, NodeType::axon,     50};
+
+    void createNeuronAt (Coord const x, Coord const y, Coord const z);
+    void createArbor    (size_t const neuronId, Point const origin, ArborParams const& params);
 public:
-    std::vector<NeuronNode>          nodes;
-    std::vector<std::pair<int, int>> connections;
+    std::vector<NeuronNode>                nodes;
+    std::vector<std::pair<size_t, size_t>> connections;
 
     UniformLayer (BoundingBox const& box, int const neuronCount);
 };
 
-class Network
+class TestLayer
 {
 public:
-    std::vector<NeuronNode>          nodes;
-    std::vector<std::pair<int, int>> connections;
+    std::vector<NeuronNode>                nodes;
+    std::vector<std::pair<size_t, size_t>> connections;
 
-    template <typename... Args> explicit Network (Args&&... args) { [] (auto...) {} ((add (std::forward<Args> (args)), 1)...); }
+    TestLayer (std::initializer_list<NeuronNode> const nodes);
+};
+
+class Network
+{
+    void connect ();
+public:
+    std::vector<NeuronNode>                nodes;
+    std::vector<std::pair<size_t, size_t>> connections;
+
+	template <class BBOX>
+	bool kdtree_get_bbox (BBOX &bb) const
+    {
+        return false;
+    }
+
+    template <typename... Args>
+    explicit Network (Args&&... args)
+    {
+        [] (auto...) {} ((add (std::forward<Args> (args)), 1)...);
+        connect ();
+    }
     void add (StimulusLayer const& layer);
     void add (UniformLayer const& layer);
+    void add (TestLayer const& layer);
+	inline auto kdtree_get_point_count () const -> size_t;
+	inline auto kdtree_distance (Coord const * const p1, size_t const idx_p2, size_t size) const -> Coord;
+	inline auto kdtree_get_pt (size_t const idx, int dim) const -> Coord;
 };
 
 struct NodeInfo
 {
-    int   isNotProcessed;
-    int   nearestNode;
-    Coord pathTroughNearest;
+    int    isNotProcessed;
+    size_t nearestNode;
+    Coord  pathTroughNearest;
 };
 
-std::pair<int, int>
-findNearest (Matrix const&         distances,
-            std::vector<NodeInfo>& nodeInfos,
-            int const              node,
-            Coord const            factor);
-void
-initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes);
+auto findNearest (Matrix const& distances, std::vector<NodeInfo>& nodeInfos, size_t const node, Coord const factor)
+    -> std::pair<size_t, size_t>;
+void initDistances (Matrix& distances, std::vector<NeuronNode> const& nodes);
 
 #endif // NETWORK_H

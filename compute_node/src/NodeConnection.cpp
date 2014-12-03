@@ -213,7 +213,7 @@ void NodeConnection::linkToRemote ()
 void NodeConnection::createNetwork ()
 {
     Network network {StimulusLayer {BoundingBox {Point {-200, -300, 400}, Point {200, -300, -400}}, stimulusActivityMap},
-                     UniformLayer  {BoundingBox {Point {-200, -100, 400}, Point {200,  100, -400}}, NeuronCount {30}}};
+                     UniformLayer  {BoundingBox {Point {-200, -280, 400}, Point {200, -200, -400}}, NeuronCount {30}}};
 
     int i = 0;
     for_each (network.nodes.cbegin (), network.nodes.cend (), [&] (NeuronNode const& n)
