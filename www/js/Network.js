@@ -30,7 +30,7 @@ function Network (gl, vnn)
           NODE_END_TIME_BYTE_OFFSET = NODE_END_TIME_OFFSET * FLOAT_SIZE,
           NODE_ATTR_BYTE_OFFSET     = NODE_ATTR_OFFSET     * FLOAT_SIZE,
           //
-          NODE_BUF_INC = 0, EDGE_BUF_INC = 0, SPIKE_BUF_INC = 0;
+          NODE_BUF_INC = 5000, EDGE_BUF_INC = 5000, SPIKE_BUF_INC = 5000;
 
     // node array used to accumulate position data which is transfered in the draw method to the typed array and gl vertex buffer
     // nodesArray = [x, y, z, end_time, ...]
@@ -43,7 +43,8 @@ function Network (gl, vnn)
     var edgeSpikesPool = new PseudoQueue (), spikesArray = new Float32Array (SPIKE_BUF_INC), numSpikes = 0, radiatingSpikes = [];
     var heap = new MinBinaryHeap ();
 
-    var selInbound = [], selOutbound = [], selNeighbours = [], selInConnArray  = new Uint16Array (), selOutConnArray = new Uint16Array ();
+    var selInbound = [], selOutbound = [], selNeighbours = [], selInConnArray  = new Uint16Array (), selOutConnArray = new Uint16Array (),
+        spikeData = [], graph;
 
     var nodeProgram       = initProgram (gl, 'node'),
         nodePickerProgram = initProgram (gl, 'nodePicker'),
@@ -170,6 +171,10 @@ function Network (gl, vnn)
                 selInbound    = [];
                 selOutbound   = [];
                 selNeighbours = [];
+
+                if (graph) graph.destroy ();
+                graph = undefined;
+                spikeData = [];
             });
     }
 
@@ -184,38 +189,46 @@ function Network (gl, vnn)
         }
     }
 
-    this.selected_inbound = function (id)
+    this.selected_inbound = function (idA, idB)
     {
         if (lastSelectedId < MAX_ID)
         {
-            selInbound.push (id);
-            var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
-            nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.inbound_color);
-            nodesToUpdate.push (id);
+            selInbound.push (idA);
+            selInbound.push (idB);
+            var idxA = idA * NODE_SIZE + NODE_ATTR_OFFSET,
+                idxB = idB * NODE_SIZE + NODE_ATTR_OFFSET;
+            nodesArray[idxA] = colorToAttr (nodesArray[idxA], vnn.params.inbound_color);
+            nodesArray[idxB] = colorToAttr (nodesArray[idxB], vnn.params.inbound_color);
+            nodesToUpdate.push (idA);
+            nodesToUpdate.push (idB);
 
             var len = selInConnArray.length;
             selInConnArray = reallocateUintArray (selInConnArray, len + 2);
-            selInConnArray[len]     = +lastSelectedId;
-            selInConnArray[len + 1] = id;
+            selInConnArray[len]     = idA;
+            selInConnArray[len + 1] = idB;
 
             gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selInConnBuf);
             gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, selInConnArray, gl.STATIC_DRAW);
         }
     }
 
-    this.selected_outbound = function (id)
+    this.selected_outbound = function (idA, idB)
     {
         if (lastSelectedId < MAX_ID)
         {
-            selOutbound.push (id);
-            var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
-            nodesArray[idx] = colorToAttr (nodesArray[idx], vnn.params.outbound_color);
-            nodesToUpdate.push (id);
+            selOutbound.push (idA);
+            selOutbound.push (idB);
+            var idxA = idA * NODE_SIZE + NODE_ATTR_OFFSET,
+                idxB = idB * NODE_SIZE + NODE_ATTR_OFFSET;
+            nodesArray[idxA] = colorToAttr (nodesArray[idxA], vnn.params.outbound_color);
+            nodesArray[idxB] = colorToAttr (nodesArray[idxB], vnn.params.outbound_color);
+            nodesToUpdate.push (idA);
+            nodesToUpdate.push (idB);
 
             var len = selOutConnArray.length;
             selOutConnArray = reallocateUintArray (selOutConnArray, len + 2);
-            selOutConnArray[len]     = +lastSelectedId;
-            selOutConnArray[len + 1] = id;
+            selOutConnArray[len]     = idA;
+            selOutConnArray[len + 1] = idB;
 
             gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, selOutConnBuf);
             gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, selOutConnArray, gl.STATIC_DRAW);
@@ -271,6 +284,14 @@ function Network (gl, vnn)
         var v_idx = v_i * NODE_SIZE;
 
         var time = performance.now () / 1000;
+
+        if (v_i == lastSelectedId)
+        {
+            spikeData.push([time - 0.001, 0], [time, 1], [time + 0.001, 0]);
+            if (graph === undefined)
+                graph = new Dygraph ('graph', spikeData, { labels: ['Time', 'Spike'] });
+            graph.updateOptions({ file: spikeData });
+        }
 
         if (v_i < numNodes)
         {

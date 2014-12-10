@@ -12,9 +12,9 @@ using namespace std;
 BOOST_AUTO_TEST_CASE (NetworkTest)
 {
     Network network {StimulusLayer {BoundingBox {Point {0, 0, 0}, Point {0, 0, 0}}, ActivityMap {{}}},
-                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}},
-                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}},
-                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}}};
+                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}, 1},
+                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}, 1},
+                     UniformLayer {BoundingBox {Point {0, 0, 0}, Point {10, 10, 10}}, NeuronCount {10}, 1}};
 
     BOOST_CHECK (true);
 }

@@ -8,8 +8,8 @@
 -export ([start_link/0,
           add_handler/2,
           delete_handler/2,
-          notify_inbound/1,
-          notify_outbound/1,
+          notify_inbound/2,
+          notify_outbound/2,
           notify_neighbour/1,
           notify_position/3,
           notify_connection/2,
@@ -54,10 +54,10 @@ delete_handler (Handler, Args) ->
 %% Notify node is inbound
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec notify_inbound (non_neg_integer ()) -> ok.
+-spec notify_inbound (non_neg_integer (), non_neg_integer ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-notify_inbound (Id) ->
-    gen_event:notify (?MODULE, {notify_inbound, Id}).
+notify_inbound (IdA, IdB) ->
+    gen_event:notify (?MODULE, {notify_inbound, IdA, IdB}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -65,10 +65,10 @@ notify_inbound (Id) ->
 %% Notify node is outbound
 %% @end
 %%--------------------------------------------------------------------------------------------------
--spec notify_outbound (non_neg_integer ()) -> ok.
+-spec notify_outbound (non_neg_integer (), non_neg_integer ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
-notify_outbound (Id) ->
-    gen_event:notify (?MODULE, {notify_outbound, Id}).
+notify_outbound (IdA, IdB) ->
+    gen_event:notify (?MODULE, {notify_outbound, IdA, IdB}).
 
 
 %%--------------------------------------------------------------------------------------------------

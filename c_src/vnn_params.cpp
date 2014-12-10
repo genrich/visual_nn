@@ -9,7 +9,7 @@ using namespace std;
 
 #define PARAMS_DIV  \
     X (spike_speed) \
-    X (active_rate)  \
+    X (active_rate) \
     X (rest_rate)
 
 #define PARAMS   \

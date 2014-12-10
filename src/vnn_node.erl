@@ -39,7 +39,9 @@
 %%--------------------------------------------------------------------------------------------------
 create (Id, Type, Position) ->
     vnn_event:notify_position (Id, Type, Position),
-    spawn (vnn_node, loop, [#s{id = Id, type = Type, position = Position}]).
+    Node = spawn (vnn_node, loop, [#s{id = Id, type = Type, position = Position}]),
+    Node ! soma_init,
+    Node.
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -124,90 +126,104 @@ consider_neighbours (PidA, PidB) ->
 -spec loop (#s{}) -> no_return ().
 %%--------------------------------------------------------------------------------------------------
 loop (#s{id             = Id,
+         soma           = Soma,
          type           = Type,
-         position       = Position,
-         node_to_length = NodeToLength,
-         inbound        = Inbound,
-         outbound       = Outbound,
-         neighbours     = Neighbours}
-      = State) ->
+         position       = Position}
+      = S) ->
     NewState =
     receive
-        spike when State#s.is_active ->
-            process_spike (Type, Id, NodeToLength, Outbound),
-            State;
+        spike when S#s.is_active ->
+            process_spike (Type, Id, S#s.node_to_length, S#s.outbound),
+            S;
 
         spike ->
-            State;
+            S;
 
         start when Type == stimulus_active;
                    Type == stimulus_rest ->
             spike_after (vnn_stimulus:next_spike (Type)),
-            State#s{is_active = true};
+            S#s{is_active = true};
 
-        start when State#s.is_active == false ->
-            State#s{is_active = true};
+        start when S#s.is_active == false ->
+            S#s{is_active = true};
 
         start ->
-            State;
+            S;
 
-        stop when State#s.is_active ->
-            State#s{is_active = false};
+        stop when S#s.is_active ->
+            S#s{is_active = false};
 
         stop ->
-            State;
+            S;
+
+        soma_init ->
+            S#s{soma = self ()};
 
         notify_selected ->
-            [NodeB ! notify_inbound   || NodeB      <- sets:to_list (Inbound)],
-            [NodeB ! notify_outbound  || NodeB      <- sets:to_list (Outbound)],
-            [NodeB ! notify_neighbour || {_, NodeB} <- Neighbours],
-            State;
+            [NodeB ! {notify_inbound,  S#s.soma, S#s.id}  || NodeB <- sets:to_list (S#s.inbound)],
+            [NodeB ! {notify_outbound, S#s.soma, S#s.id}  || NodeB <- sets:to_list (S#s.outbound)],
+            [NodeB ! notify_neighbour || {_, NodeB} <- S#s.neighbours],
+            S;
 
-        notify_inbound ->
-            vnn_event:notify_inbound (Id),
-            State;
+        {notify_inbound, Soma, IdB} ->
+            Id = S#s.id,
+            vnn_event:notify_inbound (Id, IdB),
+            [NodeB ! {notify_inbound, S#s.soma, Id} || NodeB <- sets:to_list (S#s.inbound)],
+            S;
 
-        notify_outbound ->
-            vnn_event:notify_outbound (Id),
-            State;
+        {notify_inbound, _, IdB} ->
+            vnn_event:notify_inbound (S#s.id, IdB),
+            S;
+
+        {notify_outbound, Soma, IdA} ->
+            Id = S#s.id,
+            vnn_event:notify_outbound (IdA, Id),
+            [NodeB ! {notify_outbound, Soma, Id} || NodeB <- sets:to_list (S#s.outbound)],
+            S;
+
+        {notify_outbound, _, IdB} ->
+            vnn_event:notify_outbound (S#s.id, IdB),
+            S;
 
         notify_neighbour ->
-            vnn_event:notify_neighbour (Id),
-            State;
+            vnn_event:notify_neighbour (S#s.id),
+            S;
 
         {add_sub_node, Node} ->
-            State#s{sub_nodes = sets:add_element (Node, State#s.sub_nodes)};
+            S#s{sub_nodes = sets:add_element (Node, S#s.sub_nodes)};
 
         {connect_b, NodeB} ->
             NodeB ! {connect_a, self (), Position},
-            State;
+            S;
 
         {connect_a, NodeA, PositionA} ->
             Length = length (PositionA, Position),
             NodeA ! {connect_b, self (), Id, Length},
-            State#s{inbound = sets:add_element (NodeA, Inbound)};
+            S#s{inbound = sets:add_element (NodeA, S#s.inbound)};
 
         {connect_b, NodeB, NodeBId, Length} ->
             %% put (NodeB, Length),
             vnn_event:notify_connection (Id, NodeBId),
-            State#s{outbound       = sets:add_element (NodeB, Outbound),
-                    node_to_length = maps:put (NodeB, Length, NodeToLength)};
+            S#s{outbound       = sets:add_element (NodeB, S#s.outbound),
+                node_to_length = maps:put (NodeB, Length, S#s.node_to_length)};
 
         {neighbour_b, NodeB} ->
             NodeB ! {neighbour_a, self (), Position},
-            State;
+            S;
 
         {neighbour_a, NodeA, NodeAPosition} ->
             Length = length (NodeAPosition, Position),
             NodeA ! {neighbour_b, self (), Length},
-            State#s{neighbours = consider_neighbour (Length, NodeA, Neighbours, length (Neighbours))};
+            Neighbours = S#s.neighbours,
+            S#s{neighbours = consider_neighbour (Length, NodeA, Neighbours, length (Neighbours))};
 
         {neighbour_b, NodeB, Length} ->
-            State#s{neighbours = consider_neighbour (Length, NodeB, Neighbours, length (Neighbours))};
+            Neighbours = S#s.neighbours,
+            S#s{neighbours = consider_neighbour (Length, NodeB, Neighbours, length (Neighbours))};
 
         {state, ReplyTo} ->
-            ReplyTo ! State,
-            State;
+            ReplyTo ! S,
+            S;
 
         Msg ->
             throw ({unknown_message, Msg})
@@ -240,7 +256,7 @@ spike_after (Time, Node) ->
 process_spike (Type, Id, NodeToLength, Outbound) when Type =:= dendrite; Type =:= axon ->
     propagate_spikes (Id, Outbound, NodeToLength);
 
-process_spike (Type, Id, NodeToLength, Outbound) when Type =:= soma; Type =:= synapse ->
+process_spike (soma, Id, NodeToLength, Outbound) ->
     case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound, NodeToLength);
                                         false -> ok
     end;

@@ -70,8 +70,6 @@ test_shaders: test/shader/_build $(SHADER_TESTS)
 deps_plt: deps/yaws
 	sed -i 's/no_debug_info/debug_info/' deps/yaws/rebar.config
 	rebar -r clean compile
-	rm -f deps/yaws/ebin/mime_type_c.beam
-	rm -f deps/yaws/ebin/yaws_generated.beam
 	dialyzer $(PA_DEPS_EBIN) --output_plt $@ --build_plt --apps $(PLT_APPS)
 
 dialyzer: deps_plt

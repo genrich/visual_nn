@@ -55,18 +55,17 @@ class UniformLayer
         size_t   nodesCount;
         NodeType nodeType;
         Coord    std;
-        Coord    bias;
+        Point    bias;
     };
-    ArborParams const dendriticParams {100, NodeType::dendrite, 50};
-    ArborParams const axonalParams    {100, NodeType::axon,     50};
 
-    void createNeuronAt (Coord const x, Coord const y, Coord const z);
-    void createArbor    (size_t const neuronId, Point const origin, ArborParams const& params);
+    void createNeuronAt       (Coord const x, Coord const y, Coord const z, int const feedDirection);
+    void createDendriticArbor (size_t const neuronId, Point const origin);
+    void createAxonalArbor    (size_t const neuronId, Point const origin, int const feedDirection);
 public:
     std::vector<NeuronNode>                nodes;
     std::vector<std::pair<size_t, size_t>> connections;
 
-    UniformLayer (BoundingBox const& box, int const neuronCount);
+    UniformLayer (BoundingBox const& box, int const neuronCount, int const feedDirection);
 };
 
 class TestLayer
@@ -81,6 +80,7 @@ public:
 class Network
 {
     void connect ();
+    void trim ();
 public:
     std::vector<NeuronNode>                nodes;
     std::vector<std::pair<size_t, size_t>> connections;
@@ -96,6 +96,7 @@ public:
     {
         [] (auto...) {} ((add (std::forward<Args> (args)), 1)...);
         connect ();
+        trim ();
     }
     void add (StimulusLayer const& layer);
     void add (UniformLayer const& layer);

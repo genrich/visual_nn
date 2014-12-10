@@ -85,6 +85,12 @@ handle_call ({set_ws, Ws}, _State) ->
                         Position :: vnn_network:position ();
                     ({notify_spike, Id}, #state{}) -> {ok, #state{}} when
                         Id :: non_neg_integer ();
+                    ({notify_inbound, IdA, IdB}, #state{}) -> {ok, #state{}} when
+                        IdA :: non_neg_integer (),
+                        IdB :: non_neg_integer ();
+                    ({notify_outbound, IdA, IdB}, #state{}) -> {ok, #state{}} when
+                        IdA :: non_neg_integer (),
+                        IdB :: non_neg_integer ();
                     ({notify_connection, FromId, ToId}, #state{}) -> {ok, #state{}} when
                         FromId :: non_neg_integer (),
                         ToId   :: non_neg_integer ();
@@ -97,12 +103,12 @@ handle_event ({notify_spike, Id}, #state{ws = Ws} = State) ->
     [ok] = yaws_api:websocket_send (Ws, {binary, <<?MSG_SPIKE:32/little, Id:32/little>>}),
     {ok, State};
 
-handle_event ({notify_inbound, Id}, #state{ws = Ws} = State) ->
-    [ok] = yaws_api:websocket_send (Ws, {binary, <<?MSG_SELECTED_INBOUND:32/little, Id:32/little>>}),
+handle_event ({notify_inbound, IdA, IdB}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?MSG_SELECTED_INBOUND:32/little, IdA:32/little, IdB:32/little>>}),
     {ok, State};
 
-handle_event ({notify_outbound, Id}, #state{ws = Ws} = State) ->
-    [ok] = yaws_api:websocket_send (Ws, {binary, <<?MSG_SELECTED_OUTBOUND:32/little, Id:32/little>>}),
+handle_event ({notify_outbound, IdA, IdB}, #state{ws = Ws} = State) ->
+    [ok] = yaws_api:websocket_send (Ws, {binary, <<?MSG_SELECTED_OUTBOUND:32/little, IdA:32/little, IdB:32/little>>}),
     {ok, State};
 
 handle_event ({notify_neighbour, Id}, #state{ws = Ws} = State) ->

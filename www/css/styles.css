@@ -8,6 +8,14 @@ body
     padding:     0;
 }
 
+#graph
+{
+    position: absolute;
+    width:    200px;
+    height:   100px;
+    z-index:  1;
+}
+
 #viewport
 {
     position: absolute;

@@ -76,13 +76,13 @@ function initViewport (vnn)
             break;
 
         case CONST.MSG_SELECTED_INBOUND:
-            var id = new Uint32Array (buffer, 4, 1)[0];
-            network.selected_inbound (id);
+            var ids = new Uint32Array (buffer, 4, 2);
+            network.selected_inbound (ids[0], ids[1]);
             break;
 
         case CONST.MSG_SELECTED_OUTBOUND:
-            var id = new Uint32Array (buffer, 4, 1)[0];
-            network.selected_outbound (id);
+            var ids = new Uint32Array (buffer, 4, 2);
+            network.selected_outbound (ids[0], ids[1]);
             break;
 
         case CONST.MSG_POSITION:

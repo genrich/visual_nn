@@ -7,7 +7,8 @@ DEPS = $(patsubst %.o,%.d,$(OBJ))
 INC_DIRS = include $(ERL_INTERFACE)/include
 LIB_DIRS = $(ERL_INTERFACE)/lib
 LIBS     = erl_interface ei
-CXXFLAGS = -c -MMD -MP -std=c++1y -pthread -O2 -DNDEBUG
+CXXFLAGS = -c -MMD -MP -std=c++1y -pthread
+# CXXFLAGS = -c -MMD -MP -std=c++1y -pthread -O2 -DNDEBUG
 LDFLAGS  = -pthread
 
 

@@ -4,8 +4,8 @@
 
 using namespace std;
 
-static random_device rd;
-static mt19937 rnd (rd ());
+static thread_local random_device rd;
+static thread_local mt19937 rnd (rd ());
 
 static ERL_NIF_TERM exponential (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
