@@ -14,8 +14,8 @@ using namespace nanoflann;
 BOOST_AUTO_TEST_CASE (RadiusSearchTest)
 {
     int constexpr somaNode = 0;
-    Network network {TestLayer {{Point {0, 0, 0}, somaNode, NodeType::soma},
-                                {Point {1, 0, 0}, somaNode, NodeType::dendrite},
+    Network network {TestLayer {{Point {0, 0, 0}, somaNode, NodeType::stimulus_active},
+                                {Point {1, 0, 0}, somaNode, NodeType::soma},
                                 {Point {2, 0, 0}, somaNode, NodeType::dendrite},
                                 {Point {3, 0, 0}, somaNode, NodeType::dendrite},
                                 {Point {4, 0, 0}, somaNode, NodeType::dendrite}}};

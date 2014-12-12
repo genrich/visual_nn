@@ -167,7 +167,7 @@ void Network::connect ()
 	index.buildIndex ();
 
     vector<pair<size_t, Coord>> result;
-    uniform_int_distribution<> flip {0, 1};
+    uniform_int_distribution<> flip {0, 4};
 
     for (int i = 0; i < nodes.size (); ++i)
     {
@@ -334,7 +334,7 @@ void UniformLayer::createNeuronAt (Coord const x, Coord const y, Coord const z, 
 void UniformLayer::createDendriticArbor (size_t const neuronId, Point const origin)
 {
     auto constexpr std = 50;
-    auto constexpr nodesCount = 100;
+    auto constexpr nodesCount = 90;
     auto constexpr nodesCountAndSoma = nodesCount + 1;
 
     normal_distribution<Coord> normalX {bg::get<0> (origin), std},
@@ -382,7 +382,7 @@ void UniformLayer::createDendriticArbor (size_t const neuronId, Point const orig
 void UniformLayer::createAxonalArbor (size_t const neuronId, Point const origin, int const f)
 {
     Coord constexpr stdXZ = 50, stdY = 20;
-    size_t constexpr nodesCount = 100;
+    size_t constexpr nodesCount = 70;
     Coord constexpr layerDist = 200;
 
     normal_distribution<Coord> normalX {bg::get<0> (origin), stdXZ},
@@ -436,4 +436,6 @@ TestLayer::TestLayer (initializer_list<NeuronNode> const testNodes)
 {
     for (auto const& node : testNodes)
         nodes.push_back (node);
+    for (uint i = 1; i < nodes.size (); ++i)
+        connections.push_back ({i - 1, i});
 }

@@ -213,7 +213,7 @@ void NodeConnection::linkToRemote ()
 void NodeConnection::createNetwork ()
 {
     Network network {StimulusLayer {BoundingBox {Point {-200, -300, 400}, Point {200, -300, -400}}, stimulusActivityMap},
-                     UniformLayer  {BoundingBox {Point {-200, -280, 400}, Point {200, -200, -400}}, NeuronCount {20},  1},
+                     UniformLayer  {BoundingBox {Point {-200, -280, 400}, Point {200, -200, -400}}, NeuronCount {30},  1},
                      UniformLayer  {BoundingBox {Point {-200,  -80, 400}, Point {200,    0, -400}}, NeuronCount {20},  1},
                      UniformLayer  {BoundingBox {Point {-200,  120, 400}, Point {200,  200, -400}}, NeuronCount {20},  1},
                      UniformLayer  {BoundingBox {Point {-200,  220, 400}, Point {200,  400, -400}}, NeuronCount {20}, -2}};

@@ -63,6 +63,11 @@ function main ()
             send (new Uint32Array ([CONST.MSG_SELECT_NODE, id]));
         }
 
+        this.deselectNode = function (id)
+        {
+            send (new Uint32Array ([CONST.MSG_DESELECT_NODE, id]));
+        }
+
         this.setSlowdown = function (value)
         {
             vnn.params.slowdown = value;

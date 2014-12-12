@@ -5,7 +5,8 @@ var CONST =
     MSG_START_SIMULATION: 1,
     MSG_STOP_SIMULATION: 2,
     MSG_SELECT_NODE: 3,
-    MSG_SET_SLOWDOWN: 4,
+    MSG_DESELECT_NODE: 4,
+    MSG_SET_SLOWDOWN: 5,
 
     // Server messages
     MSG_SPIKE: 0,

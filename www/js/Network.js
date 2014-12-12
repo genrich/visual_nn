@@ -155,6 +155,7 @@ function Network (gl, vnn)
             },
             function (id) // called when selection is cleared
             {
+                vnn.deselectNode (id);
                 var idx = id * NODE_SIZE + NODE_ATTR_OFFSET;
                 nodesArray[idx] = attrColorClear (nodesArray[idx]);
                 selInConnArray  = new Uint16Array ();

@@ -11,7 +11,8 @@
           sim_stop/0,
           add_node/4,
           add_connection/2,
-          select_node/1]).
+          select_node/1,
+          deselect_node/1]).
 
 -export_type ([position/0, node_type/0]).
 
@@ -96,13 +97,24 @@ add_connection (NodeAId, NodeBId) ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
-%% Process node selection: notify all node neighbours and connections
+%% Process node selection: notify all node neighbours and connections, log spikes
 %% @end
 %%--------------------------------------------------------------------------------------------------
 -spec select_node (non_neg_integer ()) -> ok.
 %%--------------------------------------------------------------------------------------------------
 select_node (Id) ->
     gen_server:cast (?MODULE, {select_node, Id}).
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Process node deselection: stop spike logging
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec deselect_node (non_neg_integer ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+deselect_node (Id) ->
+    gen_server:cast (?MODULE, {deselect_node, Id}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -250,6 +262,11 @@ handle_cast ({add_connection, {NodeAId, NodeBId}}, #s{id_to_node = IdToNode} = S
 handle_cast ({select_node, Id}, #s{id_to_node = IdToNode} = State) ->
     Node = maps:get (Id, IdToNode),
     vnn_node:notify_selected (Node),
+    {noreply, State};
+
+handle_cast ({deselect_node, Id}, #s{id_to_node = IdToNode} = State) ->
+    Node = maps:get (Id, IdToNode),
+    vnn_node:notify_deselected (Node),
     {noreply, State};
 
 handle_cast (stop, State) ->

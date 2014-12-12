@@ -11,6 +11,7 @@
           start/1,
           stop/1,
           notify_selected/1,
+          notify_deselected/1,
           consider_neighbours/2,
           loop/1]).
 
@@ -24,10 +25,12 @@
              position                 :: vnn_network:position (),
              node_to_length = #{}     :: #{pid () => float ()},
              is_active = false        :: boolean (),
-             sub_nodes  = sets:new () :: sets:set (),
+             last_spike_time = 0.0    :: float (),
+             %% sub_nodes  = sets:new () :: sets:set (),
              inbound    = sets:new () :: sets:set (),
              outbound   = sets:new () :: sets:set (),
-             neighbours = []          :: neighbours_list ()}).
+             neighbours = []          :: neighbours_list (),
+             log_spikes = 0.0         :: float ()}).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -54,7 +57,7 @@ create (Id, Type, Position) ->
 create (Id, Soma, Type, Position) ->
     vnn_event:notify_position (Id, Type, Position),
     Node = spawn (vnn_node, loop, [#s{id = Id, soma = Soma, type = Type, position = Position}]),
-    Soma ! {add_sub_node, Node},
+    %% Soma ! {add_sub_node, Node},
     Node.
 
 
@@ -107,6 +110,18 @@ notify_selected (Node) ->
 
 %%--------------------------------------------------------------------------------------------------
 %% @doc
+%% Forward deselect action to the node
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec notify_deselected (pid ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+notify_deselected (Node) ->
+    Node ! notify_deselected,
+    ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
 %% Consider nodes to be neighbours
 %% @end
 %%--------------------------------------------------------------------------------------------------
@@ -127,14 +142,16 @@ consider_neighbours (PidA, PidB) ->
 %%--------------------------------------------------------------------------------------------------
 loop (#s{id             = Id,
          soma           = Soma,
-         type           = Type,
-         position       = Position}
+         type           = Type}
       = S) ->
     NewState =
     receive
         spike when S#s.is_active ->
-            process_spike (Type, Id, S#s.node_to_length, S#s.outbound),
-            S;
+            Now = vnn_params:now (),
+            case S#s.last_spike_time + vnn_params:absolute_refractory () < Now of
+                true  -> process_spike (Now, S);
+                false -> S
+            end;
 
         spike ->
             S;
@@ -163,7 +180,10 @@ loop (#s{id             = Id,
             [NodeB ! {notify_inbound,  S#s.soma, S#s.id}  || NodeB <- sets:to_list (S#s.inbound)],
             [NodeB ! {notify_outbound, S#s.soma, S#s.id}  || NodeB <- sets:to_list (S#s.outbound)],
             [NodeB ! notify_neighbour || {_, NodeB} <- S#s.neighbours],
-            S;
+            S#s{log_spikes = vnn_params:now ()};
+
+        notify_deselected ->
+            S#s{log_spikes = 0.0};
 
         {notify_inbound, Soma, IdB} ->
             Id = S#s.id,
@@ -189,15 +209,15 @@ loop (#s{id             = Id,
             vnn_event:notify_neighbour (S#s.id),
             S;
 
-        {add_sub_node, Node} ->
-            S#s{sub_nodes = sets:add_element (Node, S#s.sub_nodes)};
+        %% {add_sub_node, Node} ->
+        %%     S#s{sub_nodes = sets:add_element (Node, S#s.sub_nodes)};
 
         {connect_b, NodeB} ->
-            NodeB ! {connect_a, self (), Position},
+            NodeB ! {connect_a, self (), S#s.position},
             S;
 
         {connect_a, NodeA, PositionA} ->
-            Length = length (PositionA, Position),
+            Length = length (PositionA, S#s.position),
             NodeA ! {connect_b, self (), Id, Length},
             S#s{inbound = sets:add_element (NodeA, S#s.inbound)};
 
@@ -208,11 +228,11 @@ loop (#s{id             = Id,
                 node_to_length = maps:put (NodeB, Length, S#s.node_to_length)};
 
         {neighbour_b, NodeB} ->
-            NodeB ! {neighbour_a, self (), Position},
+            NodeB ! {neighbour_a, self (), S#s.position},
             S;
 
         {neighbour_a, NodeA, NodeAPosition} ->
-            Length = length (NodeAPosition, Position),
+            Length = length (NodeAPosition, S#s.position),
             NodeA ! {neighbour_b, self (), Length},
             Neighbours = S#s.neighbours,
             S#s{neighbours = consider_neighbour (Length, NodeA, Neighbours, length (Neighbours))};
@@ -229,6 +249,15 @@ loop (#s{id             = Id,
             throw ({unknown_message, Msg})
     end,
     vnn_node:loop (NewState).
+
+
+%%--------------------------------------------------------------------------------------------------
+-spec log_spike (float ()) -> ok.
+%%--------------------------------------------------------------------------------------------------
+log_spike (0.0) ->
+    ok;
+log_spike (StartTime) ->
+    lager:debug ("spike: ~p, ~p", [(vnn_params:now () - StartTime) / vnn_params:slowdown (), 1]).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -251,19 +280,25 @@ spike_after (Time, Node) ->
 
 
 %%--------------------------------------------------------------------------------------------------
--spec process_spike (vnn_network:node_type (), non_neg_integer (), #{pid () => float ()}, sets:set ()) -> ok.
+-spec process_spike (float (), #s{}) -> #s{}.
 %%--------------------------------------------------------------------------------------------------
-process_spike (Type, Id, NodeToLength, Outbound) when Type =:= dendrite; Type =:= axon ->
-    propagate_spikes (Id, Outbound, NodeToLength);
+process_spike (Now, #s{type = Type, id = Id, node_to_length = NodeToLength, outbound = Outbound} = S) when Type =:= dendrite;
+                                                                                                           Type =:= axon ->
+    propagate_spikes (Id, Outbound, NodeToLength),
+    S#s{last_spike_time = Now};
 
-process_spike (soma, Id, NodeToLength, Outbound) ->
-    case vnn_random:uniform () < 0.1 of true  -> propagate_spikes (Id, Outbound, NodeToLength);
-                                        false -> ok
+process_spike (Now, #s{type = soma, id = Id, node_to_length = NodeToLength, outbound = Outbound} = S) ->
+    case vnn_random:uniform () < 0.1 of true  -> log_spike (S#s.log_spikes),
+                                                 propagate_spikes (Id, Outbound, NodeToLength),
+                                                 S#s{last_spike_time = Now};
+                                        false -> S
     end;
 
-process_spike (Type, Id, NodeToLength, Outbound) -> % Type is stimulus
+process_spike (Now, #s{type = Type, id = Id, node_to_length = NodeToLength, outbound = Outbound} = S) when Type =:= stimulus_active;
+                                                                                                           Type =:= stimulus_rest ->
     propagate_spikes (Id, Outbound, NodeToLength),
-    spike_after (vnn_stimulus:next_spike (Type) + vnn_params:absolute_refractory ()).
+    spike_after (vnn_stimulus:next_spike (Type) + vnn_params:absolute_refractory ()),
+    S#s{last_spike_time = Now}.
 
 
 %%--------------------------------------------------------------------------------------------------

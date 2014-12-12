@@ -56,7 +56,7 @@ run_debug_visual_nn: compile
 run_debug: run_compute_node run_debug_visual_nn
 
 test:
-	@rebar skip_deps=true eunit $(TEST_CASE)
+	@rebar skip_deps=true compile eunit $(TEST_CASE)
 
 test/shader/_build:
 	mkdir -p $@

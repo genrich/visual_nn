@@ -71,6 +71,10 @@ handle_message ({binary, <<?MSG_SELECT_NODE:32/little, Id:32/little>>}) ->
     vnn_network:select_node (Id),
     noreply;
 
+handle_message ({binary, <<?MSG_DESELECT_NODE:32/little, Id:32/little>>}) ->
+    vnn_network:deselect_node (Id),
+    noreply;
+
 handle_message ({binary, <<?MSG_SET_SLOWDOWN:32/little, Times:32/little-float>>}) ->
     ok = vnn_params:set_slowdown (Times),
     noreply;

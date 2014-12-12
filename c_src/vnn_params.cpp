@@ -1,8 +1,10 @@
 #include <atomic>
+#include <chrono>
 
 #include "erl_nif.h"
 
 using namespace std;
+using namespace chrono;
 
 #define PARAMS_MUL \
     X (absolute_refractory)
@@ -74,11 +76,17 @@ static ERL_NIF_TERM set_slowdown (ErlNifEnv* env, int argc, const ERL_NIF_TERM a
     return enif_make_badarg (env);
 }
 
+static ERL_NIF_TERM now (ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    return enif_make_double (env, duration_cast<duration<double>> (high_resolution_clock::now ().time_since_epoch ()).count ());
+}
+
 static ErlNifFunc nifs[] =
 {
 #define X(param) {#param, 0, get_##param}, {"set_"#param, 1, set_##param},
     PARAMS
 #undef X
+    {"now", 0, now}
 };
 
 ERL_NIF_INIT (vnn_params, nifs, nullptr, nullptr, nullptr, nullptr)

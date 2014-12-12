@@ -5,7 +5,7 @@
 %%--------------------------------------------------------------------------------------------------
 -module (vnn_params).
 
--export ([
+-export ([now/0,
           slowdown/0,
           spike_speed/0,
           active_rate/0,
@@ -48,6 +48,17 @@ init () ->
     set_rest_rate (?PARAM_REST_RATE),
     set_absolute_refractory (?PARAM_ABSOLUTE_REFRACTORY),
     ok.
+
+
+%%--------------------------------------------------------------------------------------------------
+%% @doc
+%% Current nano time
+%% @end
+%%--------------------------------------------------------------------------------------------------
+-spec now () -> float ().
+%%--------------------------------------------------------------------------------------------------
+now () ->
+    erlang:nif_error (nif_not_loaded).
 
 
 %%--------------------------------------------------------------------------------------------------
@@ -167,6 +178,9 @@ set_absolute_refractory (_Speed) ->
 spike_speed_test () ->
     ?assert (vnn_params:spike_speed () > 0).
 
+slowdown_test () ->
+    ?assert (vnn_params:slowdown () > 0).
+
 set_spike_speed_exeption_test () ->
     ?assertError(badarg, vnn_params:set_slowdown (atom)).
 
@@ -176,5 +190,8 @@ set_spike_speed_int_test () ->
 set_spike_speed_test () ->
     ?assert (vnn_params:set_slowdown (99.0) =:= ok),
     ?assert (vnn_params:slowdown () =:= 99.0).
+
+now_test () ->
+    ?assert (is_float (vnn_params:now ())).
 
 -endif.

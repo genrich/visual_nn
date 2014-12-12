@@ -3,7 +3,8 @@
 -define (MSG_START_SIMULATION, 1).
 -define (MSG_STOP_SIMULATION,  2).
 -define (MSG_SELECT_NODE,      3).
--define (MSG_SET_SLOWDOWN,     4).
+-define (MSG_DESELECT_NODE,    4).
+-define (MSG_SET_SLOWDOWN,     5).
 
 %% Server messages
 -define (MSG_SPIKE,              0).
