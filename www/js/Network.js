@@ -290,7 +290,10 @@ function Network (gl, vnn)
         {
             spikeData.push([time - 0.001, 0], [time, 1], [time + 0.001, 0]);
             if (graph === undefined)
-                graph = new Dygraph ('graph', spikeData, { labels: ['Time', 'Spike'] });
+                graph = new Dygraph ('graph', spikeData, {xlabel: 'Time(s)',
+                                                          axes: {y: {drawAxis: false},
+                                                                 x: {drawAxis: false}},
+                                                          labels: ['Time', 'Spike']});
             graph.updateOptions({ file: spikeData });
         }
 

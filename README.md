@@ -6,3 +6,5 @@ Neural network Erlang node WebGL visualization. Build with erlang [rebar](https:
 Server(for simulation)  
 start: `make run`   
 stop:  `q().`
+
+[Demo](https://vimeo.com/114177267)
